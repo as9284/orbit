@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  /* Space-black palette — near-black to deep space grays */
+  --color-orbit-950: #07080f;
+  --color-orbit-900: #0c0e18;
+  --color-orbit-800: #111320;
+  --color-orbit-700: #181a28;
+  --color-orbit-600: #1f2232;
+  --color-orbit-500: #2c3048;
+  --color-orbit-400: #464c6e;
+  --color-orbit-300: #6b7094;
+  --color-orbit-200: #9ba0bc;
+  --color-orbit-100: #c8cad9;
+  --color-orbit-50: #ecedf4;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  background-color: #07080f;
+  color: #f1f5f9;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Fix browser autofill dark-mode flash */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f1f5f9;
+  -webkit-box-shadow: 0 0 0 1000px #111320 inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Date input color on dark bg */
+input[type="date"] {
+  color-scheme: dark;
+}
