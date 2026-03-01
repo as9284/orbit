@@ -8,7 +8,7 @@
 
 ### Prerequisites
 
-- Node.js 18+ (the repo is configured for [pnpm], but npm or yarn work too)
+- Node.js 18+ (this repo uses npm but yarn or pnpm can also be used)
 - A Supabase project (free tier is sufficient)
 - `.env` file at the project root containing:
   ```env
@@ -20,21 +20,21 @@
 ### Installation
 
 ```bash
-pnpm install       # or npm install / yarn install
+npm install        # or yarn install / pnpm install
 ```
 
 ### Development
 
 ```bash
-pnpm dev
+npm run dev
 # open http://localhost:5173
 ```
 
 ### Production Build
 
 ```bash
-pnpm build
-pnpm preview       # serve the production build locally
+npm run build
+npm run preview    # serve the production build locally
 ```
 
 ---
@@ -75,7 +75,7 @@ Key files:
 
 ## 🛠 Developer Notes
 
-- ESLint configured for React + TypeScript; run `pnpm lint` to check. Formatter is Prettier via ESLint.
+- ESLint configured for React + TypeScript; run `npm run lint` to check. Formatter is Prettier via ESLint.
 - `EditTaskModal` uses a `key` prop from the task ID to reset internal state when switching tasks.
 - Global state is minimal; most logic lives in `useTasks` and context.
 
