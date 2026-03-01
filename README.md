@@ -1,73 +1,84 @@
-# React + TypeScript + Vite
+# Orbit
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Orbit** is a lightweight task‑tracking web application built with React, TypeScript, and Vite. It uses Supabase for authentication and persistence, features a clean UI, and allows users to create, edit, prioritize, and archive tasks with optional due dates.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Getting Started
 
-## React Compiler
+### Prerequisites
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js 18+ (the repo is configured for [pnpm], but npm or yarn work too)
+- A Supabase project (free tier is sufficient)
+- `.env` file at the project root containing:
+  ```env
+  VITE_SUPABASE_URL=your‑supabase-url
+  VITE_SUPABASE_ANON_KEY=your‑anon-key
+  ```
+  (see `src/lib/supabase.ts` for variable usage)
 
-## Expanding the ESLint configuration
+### Installation
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install       # or npm install / yarn install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm dev
+# open http://localhost:5173
 ```
+
+### Production Build
+
+```bash
+pnpm build
+pnpm preview       # serve the production build locally
+```
+
+---
+
+## 🧱 Project Structure
+
+```
+src/
+  components/
+    ui/            # shared UI primitives (Modal, Spinner, StarField, etc.)
+    tasks/         # task-specific components (Create/Edit modals, TaskCard)
+    auth/          # authentication page
+    layout/        # layout helpers (AppLayout, Sidebar)
+  contexts/        # AuthContext for user state
+  hooks/           # custom hooks (useTasks.ts)
+  lib/             # Supabase client, validations
+  pages/           # top-level pages (DashboardPage, ArchivePage)
+  types/           # generated database typings
+```
+
+Key files:
+
+- `src/hooks/useTasks.ts` – core task CRUD logic
+- `src/lib/validations.ts` – form validators
+- `src/pages/DashboardPage.tsx` – main dashboard & edit modal logic
+
+---
+
+## ✨ Features
+
+- Signup/login with Supabase Auth
+- Create tasks with title, description, priority (low/medium/high), due date
+- Edit or delete existing tasks
+- Archive completed tasks
+- Responsive, accessible UI with keyboard support
+
+---
+
+## 🛠 Developer Notes
+
+- ESLint configured for React + TypeScript; run `pnpm lint` to check. Formatter is Prettier via ESLint.
+- `EditTaskModal` uses a `key` prop from the task ID to reset internal state when switching tasks.
+- Global state is minimal; most logic lives in `useTasks` and context.
+
+---
+
+Feel free to extend this README with deployment instructions, screenshots, or contributor guidelines as the project grows.
