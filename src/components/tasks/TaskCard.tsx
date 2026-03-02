@@ -12,19 +12,22 @@ interface Props {
 
 const PRIORITY_STYLES = {
   low: {
-    dot: "bg-white/20",
-    label: "text-white/25",
+    dot: "bg-blue-400/60",
+    label: "text-blue-400/50",
     text: "Low",
+    border: "border-l-blue-500/25",
   },
   medium: {
-    dot: "bg-white/50",
-    label: "text-white/40",
+    dot: "bg-amber-400/70",
+    label: "text-amber-400/50",
     text: "Medium",
+    border: "border-l-amber-500/30",
   },
   high: {
-    dot: "bg-white",
-    label: "text-white/70",
+    dot: "bg-rose-400",
+    label: "text-rose-400/60",
     text: "High",
+    border: "border-l-rose-500/40",
   },
 };
 
@@ -54,35 +57,48 @@ export function TaskCard({ task, onToggleComplete, onArchive, onEdit }: Props) {
 
   return (
     <div
-      className={`group flex items-start gap-3 px-4 py-3.5 rounded-xl border transition-all duration-150 ${
+      className={`group flex items-start gap-3 px-4 py-3.5 rounded-xl border-l-2 border border-white/6 transition-all duration-200 ${priority.border} ${
         task.completed
-          ? "bg-white/[0.012] border-white/4 opacity-55"
-          : "bg-white/2.5 border-white/6 hover:bg-white/4.5 hover:border-white/10"
+          ? "bg-white/1 opacity-50"
+          : "bg-white/2.5 hover:bg-white/4.5 hover:border-white/10 hover:-translate-y-px hover:shadow-lg hover:shadow-black/20"
       }`}
     >
       {/* Checkbox */}
       <button
         onClick={handleToggle}
         disabled={toggling}
-        className={`mt-0.5 shrink-0 transition-all duration-150 ${
-          task.completed ? "text-white/35" : "text-white/15 hover:text-white/55"
+        className={`mt-0.5 shrink-0 transition-all duration-200 focus-ring rounded-full ${
+          task.completed
+            ? "text-emerald-400/50 hover:text-emerald-400/80"
+            : "text-white/15 hover:text-white/55"
         }`}
-        title={task.completed ? "Mark as active" : "Mark as complete"}
+        aria-label={task.completed ? "Mark as active" : "Mark as complete"}
       >
         {task.completed ? <CheckCircle2 size={17} /> : <Circle size={17} />}
       </button>
 
       {/* Content */}
-      <div className="flex-1 min-w-0 select-none">
+      <div
+        className="flex-1 min-w-0 cursor-pointer select-none"
+        onClick={() => onEdit(task)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onEdit(task);
+          }
+        }}
+      >
         <p
-          className={`text-sm font-medium leading-snug ${
-            task.completed ? "line-through text-white/30" : "text-white/90"
+          className={`text-sm font-medium leading-snug transition-all duration-200 ${
+            task.completed ? "line-through text-white/25" : "text-white/90"
           }`}
         >
           {task.title}
         </p>
         {task.description && (
-          <p className="mt-0.5 text-xs text-white/28 line-clamp-1 leading-relaxed">
+          <p className="mt-0.5 text-xs text-white/25 line-clamp-1 leading-relaxed">
             {task.description}
           </p>
         )}
@@ -103,18 +119,18 @@ export function TaskCard({ task, onToggleComplete, onArchive, onEdit }: Props) {
       </div>
 
       {/* Hover actions */}
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 shrink-0">
         <button
           onClick={() => onEdit(task)}
-          className="p-1.5 rounded-lg text-white/25 hover:text-white/70 hover:bg-white/6 transition-colors"
-          title="Edit task"
+          className="p-1.5 rounded-lg text-white/20 hover:text-white/70 hover:bg-white/6 transition-all duration-150 focus-ring"
+          aria-label="Edit task"
         >
           <Pencil size={13} />
         </button>
         <button
           onClick={() => onArchive(task.id)}
-          className="p-1.5 rounded-lg text-white/25 hover:text-white/70 hover:bg-white/6 transition-colors"
-          title="Archive task"
+          className="p-1.5 rounded-lg text-white/20 hover:text-white/70 hover:bg-white/6 transition-all duration-150 focus-ring"
+          aria-label="Archive task"
         >
           <Archive size={13} />
         </button>

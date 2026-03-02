@@ -11,9 +11,10 @@ export function Spinner({ size = 18, className = "" }: SpinnerProps) {
       viewBox="0 0 24 24"
       fill="none"
       className={`animate-spin ${className}`}
+      aria-hidden="true"
     >
       <circle
-        className="opacity-20"
+        className="opacity-15"
         cx="12"
         cy="12"
         r="10"

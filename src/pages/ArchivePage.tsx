@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import {
   ArchiveRestore,
@@ -12,10 +12,10 @@ import { useTasksApi } from "../components/layout/AppLayout";
 import { Spinner } from "../components/ui/Spinner";
 import type { Task } from "../types/database.types";
 
-const PRIORITY_DOT = {
-  low: "bg-white/20",
-  medium: "bg-white/50",
-  high: "bg-white/90",
+const PRIORITY_DOT: Record<string, string> = {
+  low: "bg-blue-400",
+  medium: "bg-amber-400",
+  high: "bg-rose-400",
 };
 
 export function ArchivePage() {
@@ -26,20 +26,26 @@ export function ArchivePage() {
     api.fetchArchivedTasks();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleUnarchive = async (id: string) => {
-    const ok = await api.unarchiveTask(id);
-    if (ok) toast.success("Task restored");
-    else toast.error("Failed to restore task");
-  };
+  const handleUnarchive = useCallback(
+    async (id: string) => {
+      const ok = await api.unarchiveTask(id);
+      if (ok) toast.success("Task restored");
+      else toast.error("Failed to restore task");
+    },
+    [api],
+  );
 
-  const handleDelete = async (id: string) => {
-    const ok = await api.deleteForever(id);
-    if (ok) toast.success("Task permanently deleted");
-    else toast.error("Failed to delete task");
-    setConfirmDelete(null);
-  };
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const ok = await api.deleteForever(id);
+      if (ok) toast.success("Task permanently deleted");
+      else toast.error("Failed to delete task");
+      setConfirmDelete(null);
+    },
+    [api],
+  );
 
-  const handleClearAll = async () => {
+  const handleClearAll = useCallback(async () => {
     const ids = api.archivedTasks.map((t) => t.id);
     for (const id of ids) {
       await api.deleteForever(id);
@@ -47,12 +53,12 @@ export function ArchivePage() {
     toast.success(
       `Cleared ${ids.length} archived task${ids.length !== 1 ? "s" : ""}`,
     );
-  };
+  }, [api]);
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 animate-fade-in">
       {/* Page header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6 sm:mb-8">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">
             Archive
@@ -65,7 +71,7 @@ export function ArchivePage() {
         {api.archivedTasks.length > 0 && (
           <button
             onClick={() => setConfirmDelete("__all__")}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500/20 text-red-400/70 hover:text-red-400 hover:border-red-500/40 rounded-xl text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500/20 text-red-400/70 hover:text-red-400 hover:border-red-500/40 rounded-xl text-xs font-semibold transition-colors focus-ring"
           >
             <Trash2 size={13} />
             Clear all
@@ -86,24 +92,35 @@ export function ArchivePage() {
           <Spinner size={24} className="text-white/20" />
         </div>
       ) : api.archivedTasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-white/4 border border-white/6 flex items-center justify-center mb-4">
+        <div className="flex flex-col items-center justify-center py-20 text-center animate-scale-in">
+          <div className="w-12 h-12 rounded-2xl bg-white/4 border border-white/6 flex items-center justify-center mb-4 animate-float">
             <Archive size={20} className="text-white/20" />
           </div>
           <p className="text-white/25 text-sm">Archive is empty</p>
+          <p className="text-white/15 text-xs mt-1">
+            Archived tasks will appear here
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {api.archivedTasks.map((task) => (
-            <ArchivedTaskRow
+          {api.archivedTasks.map((task, i) => (
+            <div
               key={task.id}
-              task={task}
-              confirmingDelete={confirmDelete === task.id}
-              onUnarchive={() => handleUnarchive(task.id)}
-              onRequestDelete={() => setConfirmDelete(task.id)}
-              onCancelDelete={() => setConfirmDelete(null)}
-              onConfirmDelete={() => handleDelete(task.id)}
-            />
+              className="animate-slide-up"
+              style={{
+                animationDelay: `${Math.min(i * 40, 400) + 80}ms`,
+                animationFillMode: "backwards",
+              }}
+            >
+              <ArchivedTaskRow
+                task={task}
+                confirmingDelete={confirmDelete === task.id}
+                onUnarchive={() => handleUnarchive(task.id)}
+                onRequestDelete={() => setConfirmDelete(task.id)}
+                onCancelDelete={() => setConfirmDelete(null)}
+                onConfirmDelete={() => handleDelete(task.id)}
+              />
+            </div>
           ))}
         </div>
       )}
@@ -139,8 +156,17 @@ function ArchivedTaskRow({
   onCancelDelete,
   onConfirmDelete,
 }: ArchivedRowProps) {
+  const borderColor =
+    task.priority === "high"
+      ? "border-l-rose-500"
+      : task.priority === "medium"
+        ? "border-l-amber-500"
+        : "border-l-blue-500";
+
   return (
-    <div className="group flex items-start gap-3 px-4 py-3.5 rounded-xl border bg-white/2 border-white/5 hover:bg-white/3.5 hover:border-white/8 transition-all">
+    <div
+      className={`group flex items-start gap-3 px-4 py-3.5 rounded-xl border border-l-2 bg-white/2 border-white/5 hover:bg-white/3.5 hover:border-white/8 transition-all duration-200 ${borderColor}`}
+    >
       {/* Priority dot */}
       <div className="mt-1.5 shrink-0">
         <div
@@ -170,7 +196,7 @@ function ArchivedTaskRow({
             </span>
           )}
           {task.completed && (
-            <span className="text-[10px] text-emerald-500/50 font-medium">
+            <span className="text-[10px] text-emerald-400/50 font-medium">
               Completed
             </span>
           )}
@@ -179,37 +205,39 @@ function ArchivedTaskRow({
 
       {/* Actions */}
       {!confirmingDelete ? (
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
           <button
             onClick={onUnarchive}
             title="Restore task"
-            className="p-1.5 rounded-lg text-white/25 hover:text-white/70 hover:bg-white/6 transition-colors"
+            aria-label="Restore task"
+            className="p-1.5 rounded-lg text-white/25 hover:text-white/70 hover:bg-white/6 transition-colors focus-ring"
           >
             <ArchiveRestore size={13} />
           </button>
           <button
             onClick={onRequestDelete}
             title="Delete permanently"
-            className="p-1.5 rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/8 transition-colors"
+            aria-label="Delete permanently"
+            className="p-1.5 rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/8 transition-colors focus-ring"
           >
             <Trash2 size={13} />
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 justify-end shrink-0 animate-fade-in">
           <p className="text-[11px] text-red-400/80 flex items-center gap-1">
             <AlertTriangle size={11} />
             Delete forever?
           </p>
           <button
             onClick={onConfirmDelete}
-            className="px-2.5 py-1 text-[11px] font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors"
+            className="px-2.5 py-1 text-[11px] font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors focus-ring"
           >
             Delete
           </button>
           <button
             onClick={onCancelDelete}
-            className="px-2.5 py-1 text-[11px] text-white/35 hover:text-white/60 rounded-lg transition-colors"
+            className="px-2.5 py-1 text-[11px] text-white/35 hover:text-white/60 rounded-lg transition-colors focus-ring"
           >
             Cancel
           </button>
@@ -230,12 +258,16 @@ function ConfirmDialog({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
       onClick={onCancel}
+      onKeyDown={(e) => e.key === "Escape" && onCancel()}
     >
-      <div className="absolute inset-0 bg-orbit-950/85 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-orbit-950/90" />
       <div
-        className="relative w-full max-w-sm bg-orbit-800 border border-white/8 rounded-2xl shadow-2xl p-6 space-y-4"
+        className="relative w-full max-w-sm bg-orbit-800 border border-white/8 rounded-2xl shadow-2xl p-6 space-y-4 animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
@@ -243,7 +275,10 @@ function ConfirmDialog({
             <AlertTriangle size={16} className="text-red-400" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white mb-1">
+            <h3
+              id="confirm-title"
+              className="text-sm font-semibold text-white mb-1"
+            >
               Confirm deletion
             </h3>
             <p className="text-xs text-white/40 leading-relaxed">{message}</p>
@@ -252,13 +287,14 @@ function ConfirmDialog({
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/7 rounded-xl hover:bg-white/3 transition-colors"
+            className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/[0.07] rounded-xl hover:bg-white/3 transition-colors focus-ring"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2.5 text-sm font-semibold bg-red-500 text-white rounded-xl hover:bg-red-500/90 transition-colors"
+            autoFocus
+            className="flex-1 py-2.5 text-sm font-semibold bg-red-500 text-white rounded-xl hover:bg-red-500/90 active:scale-[0.98] transition-all focus-ring"
           >
             Delete all
           </button>
