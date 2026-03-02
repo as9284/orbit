@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { isPast, isToday, parseISO } from "date-fns";
 import { useTasksApi } from "../components/layout/AppLayout";
+import { useAuth } from "../contexts/AuthContext";
 import { TaskCard } from "../components/tasks/TaskCard";
 import { CreateTaskModal } from "../components/tasks/CreateTaskModal";
 import { EditTaskModal } from "../components/tasks/EditTaskModal";
@@ -47,6 +48,7 @@ function getGreeting() {
 
 export function DashboardPage() {
   const api = useTasksApi();
+  const { encryptionKey } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -54,9 +56,11 @@ export function DashboardPage() {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
 
+  // Re-fetch whenever the encryption key becomes available (covers the
+  // fresh-sign-in case where the key isn't ready on initial mount).
   useEffect(() => {
-    api.fetchActiveTasks();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (encryptionKey) api.fetchActiveTasks();
+  }, [encryptionKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcut: N to create new task
   const openCreate = useCallback(() => setCreateOpen(true), []);

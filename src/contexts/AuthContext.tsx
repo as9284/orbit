@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -18,8 +19,6 @@ interface AuthContextValue {
   session: Session | null;
   loading: boolean;
   encryptionKey: CryptoKey | null;
-  /** true when user is authenticated but encryption key is not yet available */
-  isLocked: boolean;
   setEncryptionKey: (key: CryptoKey) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -31,6 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [encryptionKey, setKeyState] = useState<CryptoKey | null>(null);
+  // Ref so the onAuthStateChange closure can read the latest key synchronously.
+  const encryptionKeyRef = useRef<CryptoKey | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -38,19 +39,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         const key = await loadKeyFromSession();
-        if (key) setKeyState(key);
+        if (key) {
+          encryptionKeyRef.current = key;
+          setKeyState(key);
+        }
       }
       setLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+
       if (!session) {
         clearKeyFromSession();
+        encryptionKeyRef.current = null;
         setKeyState(null);
+        return;
+      }
+
+      if (event === "SIGNED_IN" && !encryptionKeyRef.current) {
+        // Try to restore the key from sessionStorage (covers token-refresh
+        // timing on page reload). AuthPage handles fresh sign-in derivation
+        // via setEncryptionKey(), so if the key is already being derived this
+        // is a no-op.
+        const savedKey = await loadKeyFromSession();
+        if (savedKey) {
+          encryptionKeyRef.current = savedKey;
+          setKeyState(savedKey);
+        }
       }
     });
 
@@ -58,17 +77,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setEncryptionKey = async (key: CryptoKey) => {
+    encryptionKeyRef.current = key;
     setKeyState(key);
     await saveKeyToSession(key);
   };
 
   const signOut = async () => {
     clearKeyFromSession();
+    encryptionKeyRef.current = null;
     setKeyState(null);
     await supabase.auth.signOut();
   };
-
-  const isLocked = !!user && !encryptionKey;
 
   return (
     <AuthContext.Provider
@@ -77,7 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         encryptionKey,
-        isLocked,
         setEncryptionKey,
         signOut,
       }}

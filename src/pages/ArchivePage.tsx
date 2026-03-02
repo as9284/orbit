@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useTasksApi } from "../components/layout/AppLayout";
+import { useAuth } from "../contexts/AuthContext";
 import { Spinner } from "../components/ui/Spinner";
 import type { Task } from "../types/database.types";
 
@@ -20,11 +21,12 @@ const PRIORITY_DOT: Record<string, string> = {
 
 export function ArchivePage() {
   const api = useTasksApi();
+  const { encryptionKey } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    api.fetchArchivedTasks();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (encryptionKey) api.fetchArchivedTasks();
+  }, [encryptionKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUnarchive = useCallback(
     async (id: string) => {
