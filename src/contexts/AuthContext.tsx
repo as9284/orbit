@@ -7,11 +7,20 @@ import {
 } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import {
+  loadKeyFromSession,
+  saveKeyToSession,
+  clearKeyFromSession,
+} from "../lib/encryption";
 
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  encryptionKey: CryptoKey | null;
+  /** true when user is authenticated but encryption key is not yet available */
+  isLocked: boolean;
+  setEncryptionKey: (key: CryptoKey) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -21,11 +30,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [encryptionKey, setKeyState] = useState<CryptoKey | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        const key = await loadKeyFromSession();
+        if (key) setKeyState(key);
+      }
       setLoading(false);
     });
 
@@ -34,17 +48,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (!session) {
+        clearKeyFromSession();
+        setKeyState(null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  const setEncryptionKey = async (key: CryptoKey) => {
+    setKeyState(key);
+    await saveKeyToSession(key);
+  };
+
   const signOut = async () => {
+    clearKeyFromSession();
+    setKeyState(null);
     await supabase.auth.signOut();
   };
 
+  const isLocked = !!user && !encryptionKey;
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        encryptionKey,
+        isLocked,
+        setEncryptionKey,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

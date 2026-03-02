@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { supabase } from "../lib/supabase";
+import { encrypt, decrypt } from "../lib/encryption";
 import type { Task } from "../types/database.types";
 
 export interface CreateTaskData {
@@ -9,7 +10,19 @@ export interface CreateTaskData {
   due_date?: string | null;
 }
 
-export function useTasks(userId: string) {
+async function decryptTask(task: Task, key: CryptoKey): Promise<Task> {
+  return {
+    ...task,
+    title: await decrypt(task.title, key),
+    description: task.description ? await decrypt(task.description, key) : null,
+  };
+}
+
+async function decryptTasks(tasks: Task[], key: CryptoKey): Promise<Task[]> {
+  return Promise.all(tasks.map((t) => decryptTask(t, key)));
+}
+
+export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
   const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
   const [loadingActive, setLoadingActive] = useState(false);
@@ -17,6 +30,7 @@ export function useTasks(userId: string) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchActiveTasks = useCallback(async () => {
+    if (!encryptionKey) return;
     setLoadingActive(true);
     setError(null);
     const { data, error } = await supabase
@@ -25,15 +39,18 @@ export function useTasks(userId: string) {
       .eq("user_id", userId)
       .eq("archived", false)
       .order("created_at", { ascending: false });
-    setLoadingActive(false);
     if (error) {
+      setLoadingActive(false);
       setError(error.message);
       return;
     }
-    setActiveTasks(data ?? []);
-  }, [userId]);
+    const decrypted = await decryptTasks(data ?? [], encryptionKey);
+    setActiveTasks(decrypted);
+    setLoadingActive(false);
+  }, [userId, encryptionKey]);
 
   const fetchArchivedTasks = useCallback(async () => {
+    if (!encryptionKey) return;
     setLoadingArchived(true);
     setError(null);
     const { data, error } = await supabase
@@ -42,19 +59,26 @@ export function useTasks(userId: string) {
       .eq("user_id", userId)
       .eq("archived", true)
       .order("archived_at", { ascending: false });
-    setLoadingArchived(false);
     if (error) {
+      setLoadingArchived(false);
       setError(error.message);
       return;
     }
-    setArchivedTasks(data ?? []);
-  }, [userId]);
+    const decrypted = await decryptTasks(data ?? [], encryptionKey);
+    setArchivedTasks(decrypted);
+    setLoadingArchived(false);
+  }, [userId, encryptionKey]);
 
   const createTask = async (data: CreateTaskData): Promise<boolean> => {
+    if (!encryptionKey) return false;
+    const encTitle = await encrypt(data.title.trim(), encryptionKey);
+    const encDesc = data.description?.trim()
+      ? await encrypt(data.description.trim(), encryptionKey)
+      : null;
     const { error } = await supabase.from("tasks").insert({
       user_id: userId,
-      title: data.title.trim(),
-      description: data.description?.trim() || null,
+      title: encTitle,
+      description: encDesc,
       priority: data.priority ?? "medium",
       due_date: data.due_date || null,
     });
@@ -70,11 +94,21 @@ export function useTasks(userId: string) {
     id: string,
     updates: Partial<CreateTaskData>,
   ): Promise<boolean> => {
+    if (!encryptionKey) return false;
+    const encTitle = updates.title?.trim()
+      ? await encrypt(updates.title.trim(), encryptionKey)
+      : undefined;
+    const encDesc =
+      updates.description !== undefined
+        ? updates.description?.trim()
+          ? await encrypt(updates.description.trim(), encryptionKey)
+          : null
+        : undefined;
     const { error } = await supabase
       .from("tasks")
       .update({
-        title: updates.title?.trim(),
-        description: updates.description?.trim() || null,
+        title: encTitle,
+        description: encDesc,
         priority: updates.priority,
         due_date: updates.due_date,
       })

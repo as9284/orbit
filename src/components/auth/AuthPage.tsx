@@ -8,6 +8,8 @@ import {
   validateFullName,
   validateConfirmPassword,
 } from "../../lib/validations";
+import { generateSalt, deriveKey } from "../../lib/encryption";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   Eye,
   EyeOff,
@@ -21,6 +23,7 @@ import {
 type Mode = "signin" | "signup";
 
 export function AuthPage() {
+  const { setEncryptionKey } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -71,12 +74,12 @@ export function AuthPage() {
     }
     setLoading(true);
     setGlobalError(null);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({
       email: siEmail.trim().toLowerCase(),
       password: siPassword,
     });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       if (error.message.includes("Invalid login credentials")) {
         setGlobalError("Incorrect email or password.");
       } else if (error.message.includes("Email not confirmed")) {
@@ -84,8 +87,22 @@ export function AuthPage() {
       } else {
         setGlobalError(error.message);
       }
+      return;
     }
-    // Success: AuthContext picks up the new session automatically
+    // Derive encryption key from password + stored salt
+    if (signInData.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("encryption_salt")
+        .eq("id", signInData.user.id)
+        .single();
+      if (profile?.encryption_salt) {
+        const key = await deriveKey(siPassword, profile.encryption_salt);
+        await setEncryptionKey(key);
+      }
+    }
+    setLoading(false);
+    // AuthContext picks up the new session automatically
   };
 
   const handleSignUp = async (e: FormEvent) => {
@@ -107,8 +124,8 @@ export function AuthPage() {
       password: suPassword,
       options: { data: { full_name: suName.trim() } },
     });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       if (error.message.toLowerCase().includes("already registered")) {
         setGlobalError(
           "An account with this email already exists. Try signing in.",
@@ -118,6 +135,17 @@ export function AuthPage() {
       }
       return;
     }
+    // Generate salt and derive encryption key for the new user
+    if (data.user) {
+      const salt = generateSalt();
+      await supabase
+        .from("profiles")
+        .update({ encryption_salt: salt })
+        .eq("id", data.user.id);
+      const key = await deriveKey(suPassword, salt);
+      await setEncryptionKey(key);
+    }
+    setLoading(false);
     if (data.session === null) {
       setSuccessMsg(
         "Account created! Check your email to confirm your account before signing in.",
