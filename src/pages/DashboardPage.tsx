@@ -16,6 +16,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { TaskCard } from "../components/tasks/TaskCard";
 import { CreateTaskModal } from "../components/tasks/CreateTaskModal";
 import { EditTaskModal } from "../components/tasks/EditTaskModal";
+import { TaskPreviewModal } from "../components/tasks/TaskPreviewModal";
 import { Spinner } from "../components/ui/Spinner";
 import type { Task } from "../types/database.types";
 
@@ -51,6 +52,7 @@ export function DashboardPage() {
   const { encryptionKey } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [previewTask, setPreviewTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("recent");
   const [sortOpen, setSortOpen] = useState(false);
@@ -72,7 +74,8 @@ export function DashboardPage() {
         !e.metaKey &&
         !e.altKey &&
         !createOpen &&
-        !editTask
+        !editTask &&
+        !previewTask
       ) {
         const tag = (e.target as HTMLElement).tagName;
         if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -82,7 +85,7 @@ export function DashboardPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openCreate, createOpen, editTask]);
+  }, [openCreate, createOpen, editTask, previewTask]);
 
   useEffect(() => {
     if (!sortOpen) return;
@@ -337,6 +340,7 @@ export function DashboardPage() {
                 onToggleComplete={handleToggle}
                 onArchive={handleArchive}
                 onEdit={setEditTask}
+                onPreview={setPreviewTask}
               />
             </div>
           ))}
@@ -353,6 +357,14 @@ export function DashboardPage() {
         task={editTask}
         onClose={() => setEditTask(null)}
         onSave={handleSave}
+      />
+      <TaskPreviewModal
+        task={previewTask}
+        onClose={() => setPreviewTask(null)}
+        onEdit={(t) => {
+          setPreviewTask(null);
+          setEditTask(t);
+        }}
       />
     </div>
   );

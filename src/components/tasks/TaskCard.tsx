@@ -8,6 +8,7 @@ interface Props {
   onToggleComplete: (id: string, completed: boolean) => Promise<boolean>;
   onArchive: (id: string) => Promise<boolean>;
   onEdit: (task: Task) => void;
+  onPreview?: (task: Task) => void;
 }
 
 const PRIORITY_STYLES = {
@@ -40,7 +41,13 @@ function getDueDateDisplay(due: string, completed: boolean) {
   return { label: format(d, "MMM d"), cls: "text-white/40" };
 }
 
-export function TaskCard({ task, onToggleComplete, onArchive, onEdit }: Props) {
+export function TaskCard({
+  task,
+  onToggleComplete,
+  onArchive,
+  onEdit,
+  onPreview,
+}: Props) {
   const [toggling, setToggling] = useState(false);
 
   const handleToggle = async () => {
@@ -80,13 +87,13 @@ export function TaskCard({ task, onToggleComplete, onArchive, onEdit }: Props) {
       {/* Content */}
       <div
         className="flex-1 min-w-0 cursor-pointer select-none"
-        onClick={() => onEdit(task)}
+        onClick={() => (onPreview ?? onEdit)(task)}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            onEdit(task);
+            (onPreview ?? onEdit)(task);
           }
         }}
       >

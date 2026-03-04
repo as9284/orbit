@@ -11,6 +11,7 @@ import { format, parseISO } from "date-fns";
 import { useTasksApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
 import { Spinner } from "../components/ui/Spinner";
+import { Modal } from "../components/ui/Modal";
 import type { Task } from "../types/database.types";
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -49,6 +50,7 @@ export function ArchivePage() {
 
   const handleClearAll = useCallback(async () => {
     const ids = api.archivedTasks.map((t) => t.id);
+    setConfirmDelete(null);
     for (const id of ids) {
       await api.deleteForever(id);
     }
@@ -128,13 +130,12 @@ export function ArchivePage() {
       )}
 
       {/* Confirm clear-all dialog */}
-      {confirmDelete === "__all__" && (
-        <ConfirmDialog
-          message={`Permanently delete all ${api.archivedTasks.length} archived tasks? This cannot be undone.`}
-          onConfirm={handleClearAll}
-          onCancel={() => setConfirmDelete(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={confirmDelete === "__all__"}
+        message={`Permanently delete all ${api.archivedTasks.length} archived tasks? This cannot be undone.`}
+        onConfirm={handleClearAll}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }
@@ -252,41 +253,31 @@ function ArchivedTaskRow({
 }
 
 function ConfirmDialog({
+  open,
   message,
   onConfirm,
   onCancel,
 }: {
+  open: boolean;
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
-      role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="confirm-title"
-      onClick={onCancel}
-      onKeyDown={(e) => e.key === "Escape" && onCancel()}
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title="Confirm deletion"
+      maxWidth="max-w-sm"
     >
-      <div className="absolute inset-0 bg-orbit-950/90" />
-      <div
-        className="relative w-full max-w-sm bg-orbit-800 border border-white/[0.09] rounded-2xl shadow-2xl p-6 space-y-4 animate-scale-in"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="space-y-4">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0 mt-0.5">
             <AlertTriangle size={16} className="text-red-400" />
           </div>
-          <div>
-            <h3
-              id="confirm-title"
-              className="text-sm font-semibold text-white mb-1"
-            >
-              Confirm deletion
-            </h3>
-            <p className="text-xs text-white/45 leading-relaxed">{message}</p>
-          </div>
+          <p className="text-xs text-white/45 leading-relaxed pt-1">
+            {message}
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -297,13 +288,12 @@ function ConfirmDialog({
           </button>
           <button
             onClick={onConfirm}
-            autoFocus
             className="flex-1 py-2.5 text-sm font-semibold bg-red-500 text-white rounded-xl hover:bg-red-500/90 active:scale-[0.98] transition-all focus-ring"
           >
             Delete all
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

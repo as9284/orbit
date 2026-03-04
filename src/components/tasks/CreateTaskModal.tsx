@@ -7,6 +7,7 @@ import {
   validateTaskDescription,
 } from "../../lib/validations";
 import { AlignLeft, Flag } from "lucide-react";
+import { RichTextEditor } from "../ui/RichTextEditor";
 import type { CreateTaskData } from "../../hooks/useTasks";
 
 interface Props {
@@ -129,16 +130,14 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
               Description
             </span>
           </div>
-          <textarea
-            placeholder="Add a description (optional)"
+          <RichTextEditor
             value={desc}
-            maxLength={2000}
-            rows={3}
-            onChange={(e) => {
-              setDesc(e.target.value);
+            onChange={(v) => {
+              setDesc(v);
               setErrors((p) => ({ ...p, desc: undefined }));
             }}
-            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-white/85 text-sm placeholder:text-white/25 outline-none focus:border-violet-500/35 focus:bg-white/[0.06] transition-all duration-200 resize-none"
+            maxLength={2000}
+            hasError={!!errors.desc}
           />
           {errors.desc && (
             <p className="mt-1 text-[11px] text-red-400">{errors.desc}</p>

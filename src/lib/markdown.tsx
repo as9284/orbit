@@ -1,0 +1,101 @@
+/**
+ * Renders a markdown-like string into an array of React elements.
+ * Supports: **bold**, *italic*, ~~strikethrough~~, bullet lists (- ),
+ * numbered lists (1. ), and line breaks.
+ */
+export function renderMarkdown(text: string): React.ReactNode[] {
+  const lines = text.split("\n");
+  const result: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+  let listType: "ul" | "ol" | null = null;
+  let key = 0;
+
+  function flushList() {
+    if (listType === "ul") {
+      result.push(
+        <ul key={key++} className="list-disc list-inside space-y-0.5">
+          {listItems}
+        </ul>,
+      );
+    } else if (listType === "ol") {
+      result.push(
+        <ol key={key++} className="list-decimal list-inside space-y-0.5">
+          {listItems}
+        </ol>,
+      );
+    }
+    listItems = [];
+    listType = null;
+  }
+
+  for (const line of lines) {
+    const ulMatch = line.match(/^[-*]\s+(.*)/);
+    const olMatch = line.match(/^\d+\.\s+(.*)/);
+
+    if (ulMatch) {
+      if (listType !== "ul") {
+        flushList();
+        listType = "ul";
+      }
+      listItems.push(<li key={key++}>{inlineFormat(ulMatch[1])}</li>);
+    } else if (olMatch) {
+      if (listType !== "ol") {
+        flushList();
+        listType = "ol";
+      }
+      listItems.push(<li key={key++}>{inlineFormat(olMatch[1])}</li>);
+    } else {
+      flushList();
+      if (line.trim() === "") {
+        result.push(<br key={key++} />);
+      } else {
+        result.push(<p key={key++}>{inlineFormat(line)}</p>);
+      }
+    }
+  }
+  flushList();
+  return result;
+}
+
+/** Applies inline formatting: bold, italic, strikethrough */
+function inlineFormat(text: string): React.ReactNode {
+  // Order matters: bold before italic since ** overlaps with *
+  const regex = /(\*\*(.+?)\*\*|~~(.+?)~~|\*(.+?)\*)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let k = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    if (match[2]) {
+      // **bold**
+      parts.push(
+        <strong key={k++} className="font-semibold text-white">
+          {match[2]}
+        </strong>,
+      );
+    } else if (match[3]) {
+      // ~~strikethrough~~
+      parts.push(
+        <del key={k++} className="text-white/40">
+          {match[3]}
+        </del>,
+      );
+    } else if (match[4]) {
+      // *italic*
+      parts.push(
+        <em key={k++} className="italic">
+          {match[4]}
+        </em>,
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts.length === 1 ? parts[0] : parts;
+}
