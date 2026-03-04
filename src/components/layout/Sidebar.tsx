@@ -29,18 +29,19 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="w-56 shrink-0 hidden md:flex flex-col bg-orbit-900 border-r border-white/4 sticky top-0 h-screen z-20">
+      <aside className="w-56 shrink-0 hidden md:flex flex-col bg-orbit-900/95 border-r border-white/[0.06] sticky top-0 h-screen z-20 backdrop-blur-sm">
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/4">
+        <div className="px-5 py-5 border-b border-white/[0.06]">
           <div className="flex items-center gap-3 select-none">
-            <div className="w-8 h-8 rounded-xl bg-white/6 border border-white/8 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-white/[0.07] border border-white/[0.1] flex items-center justify-center shrink-0 relative">
+              <div className="absolute inset-0 rounded-xl bg-violet-500/10 blur-md animate-pulse-soft" />
               <OrbitMark />
             </div>
             <div>
               <span className="text-sm font-bold tracking-tight text-white block">
                 Orbit
               </span>
-              <span className="text-[9px] text-white/20 tracking-[0.2em] uppercase">
+              <span className="text-[9px] text-white/25 tracking-[0.2em] uppercase">
                 Task Universe
               </span>
             </div>
@@ -61,8 +62,8 @@ export function Sidebar() {
               className={({ isActive }) =>
                 `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus-ring ${
                   isActive
-                    ? "bg-white/8 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
-                    : "text-white/30 hover:text-white/70 hover:bg-white/4"
+                    ? "bg-white/[0.09] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
+                    : "text-white/35 hover:text-white/75 hover:bg-white/[0.05]"
                 }`
               }
             >
@@ -84,13 +85,13 @@ export function Sidebar() {
         </nav>
 
         {/* User area */}
-        <div className="px-3 pb-4 border-t border-white/4 pt-4">
+        <div className="px-3 pb-4 border-t border-white/[0.06] pt-4">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl">
-            <div className="w-8 h-8 rounded-full bg-linear-to-br from-violet-500/20 to-blue-500/20 border border-white/8 flex items-center justify-center text-[10px] font-bold text-white/60 shrink-0 select-none">
+            <div className="w-8 h-8 rounded-full bg-linear-to-br from-violet-500/25 to-blue-500/25 border border-white/10 flex items-center justify-center text-[10px] font-bold text-white/70 shrink-0 select-none">
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white/50 truncate">
+              <p className="text-xs font-medium text-white/55 truncate">
                 {name}
               </p>
             </div>
@@ -98,7 +99,7 @@ export function Sidebar() {
               onClick={() => openSettings()}
               title="Settings"
               aria-label="Settings"
-              className="p-1.5 rounded-lg text-white/15 hover:text-white/50 hover:bg-white/4 transition-all duration-200 focus-ring"
+              className="p-1.5 rounded-lg text-white/20 hover:text-white/55 hover:bg-white/[0.05] transition-all duration-200 focus-ring"
             >
               <Settings size={14} />
             </button>
@@ -106,7 +107,7 @@ export function Sidebar() {
               onClick={signOut}
               title="Sign out"
               aria-label="Sign out"
-              className="p-1.5 rounded-lg text-white/15 hover:text-white/50 hover:bg-white/4 transition-all duration-200 focus-ring"
+              className="p-1.5 rounded-lg text-white/20 hover:text-white/55 hover:bg-white/[0.05] transition-all duration-200 focus-ring"
             >
               <LogOut size={14} />
             </button>
@@ -134,7 +135,7 @@ export function MobileNav() {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden items-center bg-orbit-900 border-t border-white/6 px-2"
+        className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden items-stretch bg-orbit-900/95 border-t border-white/[0.07] backdrop-blur-sm pb-[env(safe-area-inset-bottom)]"
         role="navigation"
         aria-label="Mobile navigation"
       >
@@ -147,7 +148,7 @@ export function MobileNav() {
               `flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-semibold tracking-wider uppercase transition-all duration-200 focus-ring rounded-xl ${
                 isActive
                   ? "text-violet-400"
-                  : "text-white/25 hover:text-white/60"
+                  : "text-white/30 active:text-white/60"
               }`
             }
           >
@@ -167,7 +168,7 @@ export function MobileNav() {
         <button
           onClick={() => openSettings()}
           aria-label="Settings"
-          className="flex flex-col items-center gap-1 py-3 px-4 text-[10px] font-semibold tracking-wider uppercase text-white/25 hover:text-white/60 transition-colors focus-ring rounded-xl"
+          className="flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-semibold tracking-wider uppercase text-white/30 active:text-white/60 transition-colors focus-ring rounded-xl"
         >
           <Settings size={18} />
           <span>Settings</span>
@@ -175,7 +176,7 @@ export function MobileNav() {
         <button
           onClick={signOut}
           aria-label="Sign out"
-          className="flex flex-col items-center gap-1 py-3 px-4 text-[10px] font-semibold tracking-wider uppercase text-white/25 hover:text-white/60 transition-colors focus-ring rounded-xl"
+          className="flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-semibold tracking-wider uppercase text-white/30 active:text-white/60 transition-colors focus-ring rounded-xl"
         >
           <LogOut size={18} />
           <span>Sign out</span>
@@ -192,7 +193,7 @@ export function MobileNav() {
 
 function OrbitMark() {
   return (
-    <svg viewBox="0 0 18 18" fill="none" className="w-4 h-4">
+    <svg viewBox="0 0 18 18" fill="none" className="w-4 h-4 relative">
       <circle
         cx="9"
         cy="9"
@@ -208,7 +209,7 @@ function OrbitMark() {
         ry="3.3"
         stroke="white"
         strokeWidth="0.8"
-        opacity="0.4"
+        opacity="0.45"
       />
       <ellipse
         cx="9"
@@ -217,7 +218,7 @@ function OrbitMark() {
         ry="3.3"
         stroke="white"
         strokeWidth="0.8"
-        opacity="0.4"
+        opacity="0.45"
         transform="rotate(60 9 9)"
       />
       <ellipse
@@ -227,7 +228,7 @@ function OrbitMark() {
         ry="3.3"
         stroke="white"
         strokeWidth="0.8"
-        opacity="0.4"
+        opacity="0.45"
         transform="rotate(120 9 9)"
       />
     </svg>

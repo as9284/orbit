@@ -163,48 +163,58 @@ export function AuthPage() {
         className="pointer-events-none absolute inset-0 flex items-center justify-center"
         aria-hidden="true"
       >
-        <div className="w-150 h-150 rounded-full bg-violet-500/4 blur-3xl" />
+        <div className="w-[600px] h-[600px] rounded-full bg-violet-500/[0.06] blur-[120px]" />
       </div>
       <div
-        className="pointer-events-none absolute -top-50 -right-50"
+        className="pointer-events-none absolute -top-40 -right-40"
         aria-hidden="true"
       >
-        <div className="w-125 h-125 rounded-full bg-blue-500/3 blur-3xl" />
+        <div className="w-[500px] h-[500px] rounded-full bg-blue-500/[0.04] blur-[100px]" />
+      </div>
+      <div
+        className="pointer-events-none absolute bottom-0 left-1/4"
+        aria-hidden="true"
+      >
+        <div className="w-[400px] h-[400px] rounded-full bg-indigo-500/[0.03] blur-[100px]" />
       </div>
 
-      <div className="relative z-10 w-full max-w-sm">
+      <div className="relative z-10 w-full max-w-[400px]">
         {/* Branding */}
         <div
-          className="flex flex-col items-center mb-8 select-none animate-slide-up"
+          className="flex flex-col items-center mb-10 select-none animate-slide-up"
           style={{ animationDelay: "50ms", animationFillMode: "backwards" }}
         >
-          <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-3 relative">
-            <div className="absolute inset-0 rounded-xl bg-violet-500/10 blur-md animate-pulse-soft" />
+          <div className="w-14 h-14 rounded-2xl bg-white/[0.06] border border-white/[0.12] flex items-center justify-center mb-4 relative">
+            <div className="absolute inset-0 rounded-2xl bg-violet-500/15 blur-lg animate-pulse-soft" />
             <OrbitMark />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Orbit</h1>
-          <p className="text-xs text-white/30 mt-0.5 tracking-wide">
-            YOUR PERSONAL TASK UNIVERSE
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            Orbit
+          </h1>
+          <p className="text-[11px] text-white/35 mt-1 tracking-[0.2em] uppercase">
+            Your personal task universe
           </p>
         </div>
 
         {/* Card */}
         <div
-          className="bg-orbit-800/95 border border-white/[0.07] rounded-2xl overflow-hidden shadow-2xl shadow-black/70 animate-slide-up"
+          className="bg-orbit-800/90 border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl shadow-black/60 backdrop-blur-sm animate-slide-up relative"
           style={{ animationDelay: "150ms", animationFillMode: "backwards" }}
         >
+          {/* Subtle top glow */}
+          <div className="absolute -top-px left-1/4 right-1/4 h-px bg-linear-to-r from-transparent via-violet-400/30 to-transparent" />
           {/* Mode tabs */}
-          <div className="flex border-b border-white/5" role="tablist">
+          <div className="flex border-b border-white/[0.06]" role="tablist">
             {(["signin", "signup"] as const).map((m) => (
               <button
                 key={m}
                 role="tab"
                 aria-selected={mode === m}
                 onClick={() => switchMode(m)}
-                className={`flex-1 py-3 text-xs font-semibold tracking-widest uppercase transition-all duration-200 ${
+                className={`flex-1 py-3.5 text-xs font-semibold tracking-widest uppercase transition-all duration-200 ${
                   mode === m
                     ? "text-white border-b-2 border-violet-400"
-                    : "text-white/30 hover:text-white/60"
+                    : "text-white/35 hover:text-white/65"
                 }`}
               >
                 {m === "signin" ? "Sign in" : "Sign up"}
@@ -219,7 +229,7 @@ export function AuthPage() {
             </div>
           )}
 
-          <div className="p-6 space-y-4">
+          <div className="p-6 sm:p-7 space-y-4">
             {/* Alerts */}
             {successMsg && (
               <Alert
@@ -385,9 +395,10 @@ export function AuthPage() {
         </div>
 
         <p
-          className="text-center text-white/15 text-xs mt-6 tracking-widest uppercase animate-fade-in"
+          className="text-center text-white/20 text-[11px] mt-8 tracking-[0.15em] uppercase animate-fade-in flex items-center justify-center gap-2"
           style={{ animationDelay: "300ms", animationFillMode: "backwards" }}
         >
+          <Lock size={10} className="text-violet-400/40" />
           End-to-end encrypted
         </p>
       </div>
@@ -399,16 +410,14 @@ export function AuthPage() {
 
 function OrbitMark() {
   return (
-    <svg viewBox="0 0 20 20" fill="none" className="w-5 h-5 relative">
-      <circle cx="10" cy="10" r="2" fill="white" />
-      <ellipse
+    <svg viewBox="0 0 20 20" fill="none" className="w-6 h-6 relative">
+      <circle cx="10" cy="10" r="2.2" fill="white" />
+      <circle
         cx="10"
         cy="10"
-        rx="8"
-        ry="3.6"
-        stroke="white"
-        strokeOpacity="0.6"
-        strokeWidth="1.2"
+        r="3"
+        fill="rgba(139,92,246,0.15)"
+        className="animate-pulse-soft"
       />
       <ellipse
         cx="10"
@@ -416,8 +425,17 @@ function OrbitMark() {
         rx="8"
         ry="3.6"
         stroke="white"
-        strokeOpacity="0.6"
-        strokeWidth="1.2"
+        strokeOpacity="0.5"
+        strokeWidth="1"
+      />
+      <ellipse
+        cx="10"
+        cy="10"
+        rx="8"
+        ry="3.6"
+        stroke="white"
+        strokeOpacity="0.5"
+        strokeWidth="1"
         transform="rotate(60 10 10)"
       />
       <ellipse
@@ -426,8 +444,8 @@ function OrbitMark() {
         rx="8"
         ry="3.6"
         stroke="white"
-        strokeOpacity="0.6"
-        strokeWidth="1.2"
+        strokeOpacity="0.5"
+        strokeWidth="1"
         transform="rotate(120 10 10)"
       />
     </svg>
@@ -435,7 +453,7 @@ function OrbitMark() {
 }
 
 function fieldInput(hasError: boolean) {
-  return `w-full bg-transparent text-white text-sm placeholder:text-white/20 outline-none ${hasError ? "placeholder:text-red-400/40" : ""}`;
+  return `w-full bg-transparent text-white text-sm placeholder:text-white/25 outline-none ${hasError ? "placeholder:text-red-400/40" : ""}`;
 }
 
 interface FieldProps {
@@ -448,21 +466,21 @@ interface FieldProps {
 function Field({ label, icon, error, children, action }: FieldProps) {
   return (
     <div>
-      <label className="block text-[10px] font-semibold uppercase tracking-widest text-white/35 mb-1">
+      <label className="block text-[10px] font-semibold uppercase tracking-widest text-white/40 mb-1.5">
         {label}
       </label>
       <div
-        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all duration-200 ${
+        className={`flex items-center gap-2.5 px-3.5 py-3 rounded-xl border transition-all duration-200 ${
           error
             ? "border-red-500/40 bg-red-500/5"
-            : "border-white/[0.07] bg-white/3 focus-within:border-violet-500/30 focus-within:bg-white/5"
+            : "border-white/[0.08] bg-white/[0.04] focus-within:border-violet-500/40 focus-within:bg-white/[0.06] focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.06)]"
         }`}
       >
-        <span className="text-white/25 shrink-0">{icon}</span>
+        <span className="text-white/30 shrink-0">{icon}</span>
         <div className="flex-1 min-w-0">{children}</div>
         {action && <span className="shrink-0">{action}</span>}
       </div>
-      {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
+      {error && <p className="mt-1.5 text-[11px] text-red-400">{error}</p>}
     </div>
   );
 }
@@ -501,9 +519,9 @@ function ToggleEye({
       tabIndex={-1}
       onClick={onToggle}
       aria-label={show ? "Hide password" : "Show password"}
-      className="text-white/25 hover:text-white/60 transition-colors"
+      className="text-white/30 hover:text-white/60 transition-colors p-0.5"
     >
-      {show ? <EyeOff size={13} /> : <Eye size={13} />}
+      {show ? <EyeOff size={14} /> : <Eye size={14} />}
     </button>
   );
 }
@@ -513,9 +531,9 @@ function SubmitBtn({ loading, label }: { loading: boolean; label: string }) {
     <button
       type="submit"
       disabled={loading}
-      className="w-full py-2.5 mt-1 bg-white text-orbit-950 text-sm font-semibold rounded-xl hover:bg-white/90 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus-ring"
+      className="w-full py-3 mt-2 bg-linear-to-r from-violet-500 to-blue-500 text-white text-sm font-semibold rounded-xl hover:from-violet-400 hover:to-blue-400 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 focus-ring"
     >
-      {loading && <Spinner size={14} className="text-orbit-950" />}
+      {loading && <Spinner size={14} className="text-white" />}
       {label}
     </button>
   );

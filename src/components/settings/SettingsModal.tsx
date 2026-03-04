@@ -42,20 +42,20 @@ export function SettingsModal({ open, onClose }: Props) {
   return (
     <Modal open={open} onClose={onClose} title="Settings" maxWidth="max-w-md">
       {/* Tab bar */}
-      <div className="flex gap-1 mb-5 p-1 bg-white/3 border border-white/6 rounded-xl">
+      <div className="flex gap-1 mb-5 p-1 bg-white/4 border border-white/[0.07] rounded-xl">
         {TABS.map(({ id, label, icon }) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
               tab === id
                 ? id === "danger"
-                  ? "bg-red-500/15 text-red-400"
-                  : "bg-white text-orbit-950"
+                  ? "bg-red-500/15 text-red-400 shadow-sm shadow-red-500/10"
+                  : "bg-linear-to-r from-violet-500 to-blue-500 text-white shadow-sm shadow-violet-500/20"
                 : id === "danger"
-                  ? "text-white/25 hover:text-red-400/60 hover:bg-red-500/5"
-                  : "text-white/30 hover:text-white/60 hover:bg-white/4"
+                  ? "text-white/30 hover:text-red-400/60 hover:bg-red-500/5"
+                  : "text-white/35 hover:text-white/60 hover:bg-white/5"
             }`}
           >
             {icon}
@@ -181,9 +181,9 @@ function AccountTab() {
           </form>
         ) : (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-white/70">
+            <span className="text-sm text-white/75">
               {currentName || (
-                <span className="text-white/25 italic text-xs">Not set</span>
+                <span className="text-white/30 italic text-xs">Not set</span>
               )}
             </span>
             {nameSuccess ? (
@@ -203,7 +203,7 @@ function AccountTab() {
           <InlineAlert
             color="emerald"
             icon={<CheckCircle2 size={13} />}
-            msg="Confirmation link sent to your new address. Click it to complete the change."
+            msg="Email address updated. You may need to sign out and back in to see the change."
           />
         ) : emailEditing ? (
           <form onSubmit={handleChangeEmail} className="space-y-2.5">
@@ -220,8 +220,8 @@ function AccountTab() {
               className={fieldInputClass(!!emailError)}
             />
             {emailError && <FieldError msg={emailError} />}
-            <p className="text-[11px] text-white/25">
-              A confirmation link will be sent to the new address.
+            <p className="text-[11px] text-white/30">
+              Your email address will be updated immediately.
             </p>
             <div className="flex gap-2">
               <SecondaryBtn
@@ -239,7 +239,7 @@ function AccountTab() {
           </form>
         ) : (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-white/70">{currentEmail}</span>
+            <span className="text-sm text-white/75">{currentEmail}</span>
             <EditBtn onClick={() => setEmailEditing(true)} />
           </div>
         )}
@@ -406,16 +406,16 @@ function SecurityTab() {
           <CheckCircle2 size={20} className="text-emerald-400" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-white/80">
+          <p className="text-sm font-semibold text-white/85">
             Password updated
           </p>
-          <p className="text-xs text-white/30 mt-1">
+          <p className="text-xs text-white/35 mt-1">
             Your vault has been re-encrypted with a new key.
           </p>
         </div>
         <button
           onClick={() => setSuccess(false)}
-          className="mt-1 text-xs text-white/25 hover:text-white/50 transition-colors"
+          className="mt-1 text-xs text-white/30 hover:text-white/50 transition-colors"
         >
           Change again
         </button>
@@ -464,18 +464,18 @@ function SecurityTab() {
         autoComplete="new-password"
         placeholder="Repeat new password"
       />
-      <p className="text-[11px] text-white/20 leading-relaxed">
+      <p className="text-[11px] text-white/25 leading-relaxed">
         All tasks in your vault will be re-encrypted with a new key derived from
         your new password.
       </p>
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-2.5 bg-white text-orbit-950 text-sm font-semibold rounded-xl hover:bg-white/90 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full py-2.5 bg-linear-to-r from-violet-500 to-blue-500 text-white text-sm font-semibold rounded-xl hover:brightness-110 active:scale-[0.98] transition-all duration-150 shadow-md shadow-violet-500/15 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {loading ? (
           <>
-            <Spinner size={14} className="text-orbit-950" />
+            <Spinner size={14} className="text-white" />
             {loadingMsg}
           </>
         ) : (
@@ -529,13 +529,13 @@ function DangerTab({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-3.5 rounded-xl bg-red-500/5 border border-red-500/15">
-        <AlertCircle size={15} className="text-red-400/80 shrink-0 mt-0.5" />
+      <div className="flex items-start gap-3 p-3.5 rounded-xl bg-red-500/6 border border-red-500/20">
+        <AlertCircle size={15} className="text-red-400/90 shrink-0 mt-0.5" />
         <div>
-          <p className="text-xs font-semibold text-red-400/90">
+          <p className="text-xs font-semibold text-red-400">
             Permanent deletion
           </p>
-          <p className="text-[11px] text-red-400/50 mt-0.5 leading-relaxed">
+          <p className="text-[11px] text-red-400/55 mt-0.5 leading-relaxed">
             This will permanently delete your account, all tasks, and all
             encrypted data. This action cannot be undone.
           </p>
@@ -602,10 +602,10 @@ function SettingsSection({
 }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-1.5">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/35 mb-1.5">
         {label}
       </p>
-      <div className="rounded-xl border border-white/[0.07] bg-white/2 px-3.5 py-3">
+      <div className="rounded-xl border border-white/8 bg-white/[0.035] px-3.5 py-3">
         {children}
       </div>
     </div>
@@ -635,14 +635,14 @@ function PasswordField({
 }: PasswordFieldProps) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-1.5">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/35 mb-1.5">
         {label}
       </p>
       <div
-        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors duration-200 ${
+        className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border transition-colors duration-200 ${
           error
             ? "border-red-500/40 bg-red-500/5"
-            : "border-white/[0.07] bg-white/3 focus-within:border-violet-500/30 focus-within:bg-white/5"
+            : "border-white/8 bg-white/4 focus-within:border-violet-500/30 focus-within:bg-white/5"
         }`}
       >
         <input
@@ -651,13 +651,13 @@ function PasswordField({
           autoComplete={autoComplete}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 min-w-0 bg-transparent text-white text-sm placeholder:text-white/20 outline-none"
+          className="flex-1 min-w-0 bg-transparent text-white/90 text-sm placeholder:text-white/25 outline-none"
         />
         <button
           type="button"
           tabIndex={-1}
           onClick={onToggleShow}
-          className="text-white/25 hover:text-white/60 transition-colors shrink-0"
+          className="text-white/30 hover:text-white/60 transition-colors shrink-0"
           aria-label={show ? "Hide password" : "Show password"}
         >
           {show ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -669,10 +669,10 @@ function PasswordField({
 }
 
 function fieldInputClass(hasError: boolean) {
-  return `w-full px-3 py-2.5 rounded-xl border bg-white/3 text-white text-sm placeholder:text-white/20 outline-none transition-colors duration-200 ${
+  return `w-full px-3.5 py-2.5 rounded-xl border bg-white/[0.04] text-white/90 text-sm placeholder:text-white/25 outline-none transition-colors duration-200 ${
     hasError
       ? "border-red-500/40"
-      : "border-white/[0.07] focus:border-violet-500/30 focus:bg-white/5"
+      : "border-white/[0.08] focus:border-violet-500/30 focus:bg-white/5"
   }`;
 }
 
@@ -708,7 +708,7 @@ function EditBtn({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="text-[11px] font-semibold text-white/30 hover:text-violet-400 hover:bg-violet-500/5 transition-all duration-200 px-2 py-1 rounded-lg"
+      className="text-[11px] font-semibold text-white/35 hover:text-violet-400 hover:bg-violet-500/8 transition-all duration-200 px-2.5 py-1 rounded-lg"
     >
       Edit
     </button>
@@ -728,9 +728,9 @@ function PrimaryBtn({
     <button
       type={type}
       disabled={loading}
-      className="flex-1 py-2 text-sm font-semibold bg-white text-orbit-950 rounded-xl hover:bg-white/90 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 flex items-center justify-center gap-1.5"
+      className="flex-1 py-2 text-sm font-semibold bg-linear-to-r from-violet-500 to-blue-500 text-white rounded-xl hover:brightness-110 active:scale-[0.98] transition-all duration-150 shadow-sm shadow-violet-500/15 disabled:opacity-50 flex items-center justify-center gap-1.5"
     >
-      {loading && <Spinner size={13} className="text-orbit-950" />}
+      {loading && <Spinner size={13} className="text-white" />}
       {children}
     </button>
   );
@@ -749,7 +749,7 @@ function SecondaryBtn({
     <button
       type={type}
       onClick={onClick}
-      className="flex-1 py-2 text-sm font-medium text-white/35 border border-white/[0.07] rounded-xl hover:bg-white/3 hover:text-white/50 transition-all duration-200"
+      className="flex-1 py-2 text-sm font-medium text-white/40 border border-white/8 rounded-xl hover:bg-white/4 hover:text-white/55 transition-all duration-200"
     >
       {children}
     </button>

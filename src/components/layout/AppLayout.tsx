@@ -18,7 +18,7 @@ export function AppLayout() {
       </div>
       <Sidebar />
       <MobileNav />
-      <main className="flex-1 min-w-0 relative pb-16 md:pb-0">
+      <main className="flex-1 min-w-0 relative pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
         <Outlet context={tasksApi} />
       </main>
     </div>

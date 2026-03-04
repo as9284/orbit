@@ -25,23 +25,23 @@ const PRIORITIES: {
   {
     value: "low",
     label: "Low",
-    idle: "text-white/30 border-white/[0.07] hover:border-blue-500/20",
+    idle: "text-white/35 border-white/[0.08] hover:border-blue-500/25 hover:bg-blue-500/[0.04]",
     active:
-      "text-blue-400 border-blue-500/30 bg-blue-500/[0.08] shadow-[inset_0_0_0_1px_rgba(59,130,246,0.1)]",
+      "text-blue-400 border-blue-500/35 bg-blue-500/[0.1] shadow-[inset_0_0_0_1px_rgba(59,130,246,0.12)]",
   },
   {
     value: "medium",
     label: "Medium",
-    idle: "text-white/30 border-white/[0.07] hover:border-amber-500/20",
+    idle: "text-white/35 border-white/[0.08] hover:border-amber-500/25 hover:bg-amber-500/[0.04]",
     active:
-      "text-amber-400 border-amber-500/30 bg-amber-500/[0.08] shadow-[inset_0_0_0_1px_rgba(245,158,11,0.1)]",
+      "text-amber-400 border-amber-500/35 bg-amber-500/[0.1] shadow-[inset_0_0_0_1px_rgba(245,158,11,0.12)]",
   },
   {
     value: "high",
     label: "High",
-    idle: "text-white/30 border-white/[0.07] hover:border-rose-500/20",
+    idle: "text-white/35 border-white/[0.08] hover:border-rose-500/25 hover:bg-rose-500/[0.04]",
     active:
-      "text-rose-400 border-rose-500/30 bg-rose-500/[0.08] shadow-[inset_0_0_0_1px_rgba(244,63,94,0.1)]",
+      "text-rose-400 border-rose-500/35 bg-rose-500/[0.1] shadow-[inset_0_0_0_1px_rgba(244,63,94,0.12)]",
   },
 ];
 
@@ -108,10 +108,10 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
               setTitle(e.target.value);
               setErrors((p) => ({ ...p, title: undefined }));
             }}
-            className={`w-full bg-transparent text-white text-base font-medium placeholder:text-white/20 outline-none border-b pb-2.5 transition-colors duration-200 ${
+            className={`w-full bg-transparent text-white text-base font-medium placeholder:text-white/25 outline-none border-b pb-2.5 transition-colors duration-200 ${
               errors.title
                 ? "border-red-500/40"
-                : "border-white/8 focus:border-violet-500/40"
+                : "border-white/[0.09] focus:border-violet-500/40"
             }`}
           />
           {errors.title && (
@@ -121,7 +121,7 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
 
         {/* Description */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2 text-white/25">
+          <div className="flex items-center gap-1.5 mb-2 text-white/30">
             <AlignLeft size={12} />
             <span className="text-[10px] font-semibold uppercase tracking-widest">
               Description
@@ -136,7 +136,7 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
               setDesc(e.target.value);
               setErrors((p) => ({ ...p, desc: undefined }));
             }}
-            className="w-full bg-white/3 border border-white/[0.07] rounded-xl px-3.5 py-2.5 text-white/80 text-sm placeholder:text-white/20 outline-none focus:border-violet-500/30 focus:bg-white/5 transition-all duration-200 resize-none"
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-white/85 text-sm placeholder:text-white/25 outline-none focus:border-violet-500/35 focus:bg-white/[0.06] transition-all duration-200 resize-none"
           />
           {errors.desc && (
             <p className="mt-1 text-[11px] text-red-400">{errors.desc}</p>
@@ -145,7 +145,7 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
 
         {/* Priority */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2.5 text-white/25">
+          <div className="flex items-center gap-1.5 mb-2.5 text-white/30">
             <Flag size={12} />
             <span className="text-[10px] font-semibold uppercase tracking-widest">
               Priority
@@ -157,7 +157,7 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
                 key={p.value}
                 type="button"
                 onClick={() => setPriority(p.value)}
-                className={`flex-1 py-2 text-xs font-semibold border rounded-xl transition-all duration-200 ${
+                className={`flex-1 py-2.5 text-xs font-semibold border rounded-xl transition-all duration-200 ${
                   priority === p.value ? p.active : p.idle
                 }`}
               >
@@ -169,7 +169,7 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
 
         {/* Due date */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2 text-white/25">
+          <div className="flex items-center gap-1.5 mb-2 text-white/30">
             <span className="text-[10px] font-semibold uppercase tracking-widest">
               Due date
             </span>
@@ -187,16 +187,16 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 text-sm font-medium text-white/35 border border-white/[0.07] rounded-xl hover:bg-white/3 hover:text-white/50 transition-all duration-200 focus-ring"
+            className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/[0.08] rounded-xl hover:bg-white/[0.04] hover:text-white/55 transition-all duration-200 focus-ring"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 py-2.5 text-sm font-semibold bg-white text-orbit-950 rounded-xl hover:bg-white/90 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 flex items-center justify-center gap-2 focus-ring"
+            className="flex-1 py-2.5 text-sm font-semibold bg-linear-to-r from-violet-500 to-blue-500 text-white rounded-xl hover:from-violet-400 hover:to-blue-400 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-violet-500/15 focus-ring"
           >
-            {loading && <Spinner size={13} className="text-orbit-950" />}
+            {loading && <Spinner size={13} className="text-white" />}
             Save changes
           </button>
         </div>

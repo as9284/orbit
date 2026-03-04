@@ -12,32 +12,32 @@ interface Props {
 
 const PRIORITY_STYLES = {
   low: {
-    dot: "bg-blue-400/60",
-    label: "text-blue-400/50",
+    dot: "bg-blue-400/70",
+    label: "text-blue-400/60",
     text: "Low",
-    border: "border-l-blue-500/25",
+    border: "border-l-blue-500/30",
   },
   medium: {
-    dot: "bg-amber-400/70",
-    label: "text-amber-400/50",
+    dot: "bg-amber-400/80",
+    label: "text-amber-400/60",
     text: "Medium",
-    border: "border-l-amber-500/30",
+    border: "border-l-amber-500/35",
   },
   high: {
     dot: "bg-rose-400",
-    label: "text-rose-400/60",
+    label: "text-rose-400/65",
     text: "High",
-    border: "border-l-rose-500/40",
+    border: "border-l-rose-500/45",
   },
 };
 
 function getDueDateDisplay(due: string, completed: boolean) {
   const d = parseISO(due);
-  if (completed) return { label: format(d, "MMM d"), cls: "text-white/20" };
+  if (completed) return { label: format(d, "MMM d"), cls: "text-white/25" };
   if (isToday(d)) return { label: "Today", cls: "text-amber-400" };
-  if (isTomorrow(d)) return { label: "Tomorrow", cls: "text-amber-300/70" };
+  if (isTomorrow(d)) return { label: "Tomorrow", cls: "text-amber-300/75" };
   if (isPast(d)) return { label: format(d, "MMM d"), cls: "text-red-400" };
-  return { label: format(d, "MMM d"), cls: "text-white/35" };
+  return { label: format(d, "MMM d"), cls: "text-white/40" };
 }
 
 export function TaskCard({ task, onToggleComplete, onArchive, onEdit }: Props) {
@@ -57,24 +57,24 @@ export function TaskCard({ task, onToggleComplete, onArchive, onEdit }: Props) {
 
   return (
     <div
-      className={`group flex items-start gap-3 px-4 py-3.5 rounded-xl border-l-2 border border-white/6 transition-all duration-200 ${priority.border} ${
+      className={`group flex items-start gap-3 px-4 py-3.5 rounded-xl border-l-2 border border-white/[0.07] transition-all duration-200 ${priority.border} ${
         task.completed
-          ? "bg-white/1 opacity-50"
-          : "bg-white/2.5 hover:bg-white/4.5 hover:border-white/10 hover:-translate-y-px hover:shadow-lg hover:shadow-black/20"
+          ? "bg-white/[0.015] opacity-50"
+          : "bg-white/[0.03] hover:bg-white/[0.055] hover:border-white/[0.11] hover:-translate-y-px hover:shadow-lg hover:shadow-black/20"
       }`}
     >
-      {/* Checkbox */}
+      {/* Checkbox — oversized hit area for easier toggling */}
       <button
         onClick={handleToggle}
         disabled={toggling}
-        className={`mt-0.5 shrink-0 transition-all duration-200 focus-ring rounded-full ${
+        className={`-m-2 p-2 shrink-0 transition-all duration-200 focus-ring rounded-lg ${
           task.completed
-            ? "text-emerald-400/50 hover:text-emerald-400/80"
-            : "text-white/15 hover:text-white/55"
+            ? "text-emerald-400/50 hover:text-emerald-400/80 hover:bg-emerald-400/8"
+            : "text-white/15 hover:text-white/55 hover:bg-white/5"
         }`}
         aria-label={task.completed ? "Mark as active" : "Mark as complete"}
       >
-        {task.completed ? <CheckCircle2 size={17} /> : <Circle size={17} />}
+        {task.completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
       </button>
 
       {/* Content */}
@@ -92,13 +92,13 @@ export function TaskCard({ task, onToggleComplete, onArchive, onEdit }: Props) {
       >
         <p
           className={`text-sm font-medium leading-snug transition-all duration-200 ${
-            task.completed ? "line-through text-white/25" : "text-white/90"
+            task.completed ? "line-through text-white/30" : "text-white/90"
           }`}
         >
           {task.title}
         </p>
         {task.description && (
-          <p className="mt-0.5 text-xs text-white/25 line-clamp-1 leading-relaxed">
+          <p className="mt-0.5 text-xs text-white/30 line-clamp-1 leading-relaxed">
             {task.description}
           </p>
         )}
@@ -119,17 +119,17 @@ export function TaskCard({ task, onToggleComplete, onArchive, onEdit }: Props) {
       </div>
 
       {/* Hover actions */}
-      <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 shrink-0">
+      <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 shrink-0">
         <button
           onClick={() => onEdit(task)}
-          className="p-1.5 rounded-lg text-white/20 hover:text-white/70 hover:bg-white/6 transition-all duration-150 focus-ring"
+          className="p-2 sm:p-1.5 rounded-lg text-white/25 hover:text-white/70 hover:bg-white/[0.07] transition-all duration-150 focus-ring"
           aria-label="Edit task"
         >
           <Pencil size={13} />
         </button>
         <button
           onClick={() => onArchive(task.id)}
-          className="p-1.5 rounded-lg text-white/20 hover:text-white/70 hover:bg-white/6 transition-all duration-150 focus-ring"
+          className="p-2 sm:p-1.5 rounded-lg text-white/25 hover:text-white/70 hover:bg-white/[0.07] transition-all duration-150 focus-ring"
           aria-label="Archive task"
         >
           <Archive size={13} />

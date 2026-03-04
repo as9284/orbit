@@ -161,12 +161,12 @@ export function DashboardPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-10 animate-fade-in">
       {/* Page header */}
-      <div className="flex items-end justify-between mb-6 sm:mb-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-8 sm:mb-10">
         <div className="animate-slide-up">
-          <h1 className="text-2xl font-bold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
             {getGreeting()}
           </h1>
-          <p className="text-sm text-white/30 mt-1">
+          <p className="text-sm text-white/35 mt-1.5">
             {new Date().toLocaleDateString("en-US", {
               weekday: "long",
               month: "long",
@@ -176,11 +176,11 @@ export function DashboardPage() {
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white text-orbit-950 text-sm font-bold rounded-xl hover:bg-white/90 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-white/5 focus-ring"
+          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-linear-to-r from-violet-500 to-blue-500 text-white text-sm font-semibold rounded-xl hover:from-violet-400 hover:to-blue-400 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-violet-500/20 focus-ring w-full sm:w-auto"
         >
           <Plus size={16} strokeWidth={2.5} />
           New task
-          <kbd className="ml-1 text-[10px] font-medium text-orbit-400 bg-orbit-100/80 px-1.5 py-0.5 rounded hidden sm:inline">
+          <kbd className="ml-1 text-[10px] font-medium text-white/50 bg-white/15 px-1.5 py-0.5 rounded hidden sm:inline">
             N
           </kbd>
         </button>
@@ -190,18 +190,18 @@ export function DashboardPage() {
       <div className="mb-8 animate-fade-in" style={{ animationDelay: "50ms" }}>
         {/* Progress bar */}
         {stats.total > 0 && (
-          <div className="mb-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-white/30 font-medium">
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-xs text-white/35 font-medium">
                 Progress
               </span>
-              <span className="text-xs text-white/50 font-semibold tabular-nums">
+              <span className="text-xs text-white/55 font-semibold tabular-nums">
                 {progressPercent}%
               </span>
             </div>
-            <div className="h-1.5 bg-white/4 rounded-full overflow-hidden">
+            <div className="h-2 bg-white/[0.05] rounded-full overflow-hidden">
               <div
-                className="h-full bg-linear-to-r from-violet-500 to-blue-500 rounded-full transition-all duration-700 ease-out"
+                className="h-full bg-linear-to-r from-violet-500 to-blue-500 rounded-full transition-all duration-700 ease-out shadow-[0_0_8px_rgba(139,92,246,0.3)]"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -213,19 +213,19 @@ export function DashboardPage() {
             label="Total"
             value={stats.total}
             icon={<ListTodo size={14} />}
-            color="border-l-white/10"
+            color="border-l-white/15"
           />
           <StatCard
             label="Active"
             value={stats.active}
             icon={<Circle size={14} />}
-            color="border-l-blue-500/30"
+            color="border-l-blue-500/40"
           />
           <StatCard
             label="Done"
             value={stats.completed}
             icon={<CheckCircle2 size={14} />}
-            color="border-l-emerald-500/40"
+            color="border-l-emerald-500/50"
             valueColor="text-emerald-400"
           />
           <StatCard
@@ -233,7 +233,7 @@ export function DashboardPage() {
             value={stats.overdue}
             icon={<AlertCircle size={14} />}
             color={
-              stats.overdue > 0 ? "border-l-red-500/40" : "border-l-white/10"
+              stats.overdue > 0 ? "border-l-red-500/50" : "border-l-white/15"
             }
             valueColor={stats.overdue > 0 ? "text-red-400" : undefined}
           />
@@ -242,11 +242,11 @@ export function DashboardPage() {
 
       {/* Filter + sort bar */}
       <div
-        className="relative z-20 flex flex-wrap items-center justify-between gap-y-2 mb-4 sm:mb-5 animate-fade-in"
+        className="relative z-20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-y-2 mb-4 sm:mb-5 animate-fade-in"
         style={{ animationDelay: "100ms" }}
       >
         <div
-          className="flex items-center gap-1 bg-white/5 border border-white/6 rounded-xl p-1"
+          className="flex items-center gap-1 bg-white/[0.05] border border-white/[0.07] rounded-xl p-1 overflow-x-auto no-scrollbar"
           role="tablist"
           aria-label="Task filters"
         >
@@ -256,10 +256,10 @@ export function DashboardPage() {
               onClick={() => setFilter(f)}
               role="tab"
               aria-selected={filter === f}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all duration-200 focus-ring ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all duration-200 focus-ring whitespace-nowrap ${
                 filter === f
-                  ? "bg-white text-orbit-950 shadow-sm"
-                  : "text-white/30 hover:text-white/60 hover:bg-white/3"
+                  ? "bg-linear-to-r from-violet-500 to-blue-500 text-white shadow-sm shadow-violet-500/15"
+                  : "text-white/35 hover:text-white/65 hover:bg-white/[0.04]"
               }`}
             >
               {f}
@@ -275,8 +275,8 @@ export function DashboardPage() {
             aria-label="Sort tasks"
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 focus-ring ${
               sortOpen
-                ? "text-white/70 bg-white/6"
-                : "text-white/40 hover:text-white/70 hover:bg-white/4"
+                ? "text-white/75 bg-white/[0.07]"
+                : "text-white/45 hover:text-white/75 hover:bg-white/[0.05]"
             }`}
           >
             <Clock size={12} />
@@ -292,7 +292,7 @@ export function DashboardPage() {
             <div
               role="listbox"
               aria-label="Sort options"
-              className="absolute right-0 top-full mt-1.5 w-32 bg-orbit-900 border border-white/10 rounded-xl shadow-2xl shadow-black/60 overflow-hidden z-50 animate-scale-in"
+              className="absolute right-0 top-full mt-1.5 w-32 bg-orbit-900 border border-white/[0.1] rounded-xl shadow-2xl shadow-black/60 overflow-hidden z-50 animate-scale-in"
             >
               {(["recent", "priority", "due"] as Sort[]).map((s) => (
                 <button
@@ -305,8 +305,8 @@ export function DashboardPage() {
                   }}
                   className={`w-full text-left px-3.5 py-2.5 text-xs font-medium transition-colors duration-150 ${
                     sort === s
-                      ? "text-white bg-white/10"
-                      : "text-white/50 hover:text-white hover:bg-white/6"
+                      ? "text-white bg-white/[0.1]"
+                      : "text-white/50 hover:text-white hover:bg-white/[0.06]"
                   }`}
                 >
                   {SORT_LABELS[s]}
@@ -371,16 +371,16 @@ interface StatCardProps {
 function StatCard({ label, value, icon, color, valueColor }: StatCardProps) {
   return (
     <div
-      className={`relative bg-white/3 border border-white/6 border-l-2 ${color} rounded-2xl px-4 py-4 overflow-hidden hover:bg-white/5 hover:border-white/8 transition-all duration-300 group`}
+      className={`relative bg-white/[0.035] border border-white/[0.07] border-l-2 ${color} rounded-2xl px-4 py-4 overflow-hidden hover:bg-white/[0.06] hover:border-white/[0.1] transition-all duration-300 group`}
     >
-      <div className="flex items-center gap-1.5 text-white/25 mb-2">
+      <div className="flex items-center gap-1.5 text-white/30 mb-2">
         {icon}
         <span className="text-[10px] uppercase tracking-widest font-semibold">
           {label}
         </span>
       </div>
       <p
-        className={`text-2xl font-bold tabular-nums ${valueColor ?? "text-white/70"}`}
+        className={`text-2xl font-bold tabular-nums ${valueColor ?? "text-white/80"}`}
       >
         {value}
       </p>
@@ -397,18 +397,18 @@ function EmptyState({ filter, onNew }: { filter: Filter; onNew: () => void }) {
   };
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
-      <div className="w-14 h-14 rounded-2xl bg-white/4 border border-white/6 flex items-center justify-center mb-5 animate-float">
+      <div className="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/[0.07] flex items-center justify-center mb-5 animate-float">
         {filter === "all" ? (
           <Sparkles size={22} className="text-violet-400/40" />
         ) : (
           <ListTodo size={22} className="text-white/15" />
         )}
       </div>
-      <p className="text-white/30 text-sm font-medium">{msgs[filter]}</p>
+      <p className="text-white/35 text-sm font-medium">{msgs[filter]}</p>
       {filter === "all" && (
         <button
           onClick={onNew}
-          className="mt-5 flex items-center gap-2 px-5 py-2.5 border border-white/8 text-white/40 hover:text-white/70 hover:border-white/20 hover:bg-white/3 rounded-xl text-sm font-medium transition-all duration-200 focus-ring"
+          className="mt-5 flex items-center gap-2 px-5 py-2.5 border border-white/[0.1] text-white/45 hover:text-white/75 hover:border-white/20 hover:bg-white/[0.04] rounded-xl text-sm font-medium transition-all duration-200 focus-ring"
         >
           <Plus size={15} />
           Create your first task

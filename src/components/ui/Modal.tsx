@@ -100,7 +100,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pb-[calc(4rem+env(safe-area-inset-bottom))] sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -108,7 +108,7 @@ export function Modal({
     >
       {/* Backdrop */}
       <div
-        className={`absolute inset-0 bg-orbit-950/80 transition-opacity duration-200 ease-out ${
+        className={`absolute inset-0 bg-orbit-950/85 backdrop-blur-sm transition-opacity duration-200 ease-out ${
           visible ? "opacity-100" : "opacity-0"
         }`}
       />
@@ -116,29 +116,34 @@ export function Modal({
       {/* Panel */}
       <div
         ref={panelRef}
-        className={`relative w-full ${maxWidth} bg-orbit-800 border border-white/8 rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/70 max-h-[92dvh] flex flex-col transition-all duration-200 ease-out ${
+        className={`relative w-full ${maxWidth} bg-orbit-800 border border-white/[0.09] rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/60 max-h-[92dvh] flex flex-col transition-all duration-200 ease-out ${
           visible
             ? "opacity-100 scale-100 translate-y-0"
             : "opacity-0 scale-[0.96] translate-y-3"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
+        {/* Top glow accent */}
+        <div className="absolute -top-px left-1/5 right-1/5 h-px bg-linear-to-r from-transparent via-violet-400/25 to-transparent" />
+
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/[0.06] shrink-0">
           <h2
             id="modal-title"
-            className="text-sm font-semibold text-white tracking-tight"
+            className="text-sm font-semibold text-white/90 tracking-tight"
           >
             {title}
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-white/25 hover:text-white hover:bg-white/6 transition-all duration-150"
+            className="p-1.5 rounded-lg text-white/30 hover:text-white hover:bg-white/[0.07] transition-all duration-150"
             aria-label="Close"
           >
             <X size={15} />
           </button>
         </div>
-        <div className="p-5 overflow-y-auto flex-1 min-h-0">{children}</div>
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 min-h-0">
+          {children}
+        </div>
       </div>
     </div>
   );

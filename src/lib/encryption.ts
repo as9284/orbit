@@ -69,16 +69,16 @@ export async function decrypt(
   return new TextDecoder().decode(plainBuf);
 }
 
-// ── Session-level key persistence (sessionStorage) ────────────────────
-const SESSION_KEY = "orbit_ek";
+// ── Key persistence (localStorage) ────────────────────────────────────
+const STORAGE_KEY = "orbit_ek";
 
 export async function saveKeyToSession(key: CryptoKey): Promise<void> {
   const jwk = await crypto.subtle.exportKey("jwk", key);
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(jwk));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(jwk));
 }
 
 export async function loadKeyFromSession(): Promise<CryptoKey | null> {
-  const raw = sessionStorage.getItem(SESSION_KEY);
+  const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
     const jwk = JSON.parse(raw) as JsonWebKey;
@@ -95,7 +95,7 @@ export async function loadKeyFromSession(): Promise<CryptoKey | null> {
 }
 
 export function clearKeyFromSession(): void {
-  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 // ── Base-64 helpers ───────────────────────────────────────────────────
