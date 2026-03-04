@@ -5,6 +5,7 @@ import { AuthPage } from "./components/auth/AuthPage";
 import { AppLayout } from "./components/layout/AppLayout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ArchivePage } from "./pages/ArchivePage";
+import { NotesPage } from "./pages/NotesPage";
 import { Spinner } from "./components/ui/Spinner";
 
 function AppContent() {
@@ -24,6 +25,7 @@ function AppContent() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
+        <Route path="notes" element={<NotesPage />} />
         <Route path="archive" element={<ArchivePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

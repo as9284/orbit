@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { format, isPast, isToday, isTomorrow, parseISO } from "date-fns";
 import {
   Calendar,
@@ -7,15 +7,18 @@ import {
   Circle,
   CheckCircle2,
   Pencil,
+  ListChecks,
 } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { renderMarkdown } from "../../lib/markdown";
-import type { Task } from "../../types/database.types";
+import type { Task, SubTask } from "../../types/database.types";
 
 interface Props {
   task: Task | null;
   onClose: () => void;
   onEdit: (task: Task) => void;
+  fetchSubTasks: (taskId: string) => Promise<SubTask[]>;
+  onToggleSubTask: (subTaskId: string, completed: boolean) => Promise<boolean>;
 }
 
 const PRIORITY_CONFIG = {
@@ -52,12 +55,46 @@ function getDueDateInfo(due: string, completed: boolean) {
   return { label: formatted, cls: "text-white/55" };
 }
 
-export function TaskPreviewModal({ task, onClose, onEdit }: Props) {
+export function TaskPreviewModal({
+  task,
+  onClose,
+  onEdit,
+  fetchSubTasks,
+  onToggleSubTask,
+}: Props) {
   // Keep a snapshot of the last non-null task so content stays visible
   // during the Modal's exit animation (when task becomes null).
   const lastTask = useRef<Task | null>(null);
   if (task) lastTask.current = task;
   const t = lastTask.current;
+
+  const [subTasks, setSubTasks] = useState<SubTask[]>([]);
+  const [subTasksLoading, setSubTasksLoading] = useState(false);
+
+  useEffect(() => {
+    if (task) {
+      setSubTasksLoading(true);
+      setSubTasks([]);
+      fetchSubTasks(task.id).then((data) => {
+        setSubTasks(data);
+        setSubTasksLoading(false);
+      });
+    } else {
+      setSubTasks([]);
+      setSubTasksLoading(false);
+    }
+  }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleToggleSub = async (st: SubTask) => {
+    const ok = await onToggleSubTask(st.id, !st.completed);
+    if (ok) {
+      setSubTasks((prev) =>
+        prev.map((s) =>
+          s.id === st.id ? { ...s, completed: !s.completed } : s,
+        ),
+      );
+    }
+  };
 
   const priority = t ? PRIORITY_CONFIG[t.priority] : null;
   const due = t?.due_date ? getDueDateInfo(t.due_date, t.completed) : null;
@@ -107,9 +144,85 @@ export function TaskPreviewModal({ task, onClose, onEdit }: Props) {
                   Description
                 </span>
               </div>
-              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-white/70 leading-relaxed space-y-1.5">
+              <div className="bg-white/3 border border-white/6 rounded-xl px-4 py-3 text-sm text-white/70 leading-relaxed space-y-1.5">
                 {renderMarkdown(t.description)}
               </div>
+            </div>
+          )}
+
+          {/* Sub-tasks */}
+          {(subTasksLoading || subTasks.length > 0) && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2 text-white/30">
+                <ListChecks size={12} />
+                <span className="text-[10px] font-semibold uppercase tracking-widest">
+                  Sub-tasks
+                </span>
+                {!subTasksLoading && (
+                  <span className="text-[10px] text-white/20 ml-auto">
+                    {subTasks.filter((s) => s.completed).length}/
+                    {subTasks.length}
+                  </span>
+                )}
+              </div>
+              {/* Sub-task progress bar */}
+              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-3">
+                {subTasksLoading ? (
+                  <div className="h-full w-2/5 bg-white/8 rounded-full animate-pulse" />
+                ) : (
+                  <div
+                    className="h-full bg-linear-to-r from-violet-500 to-blue-500 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${subTasks.length > 0 ? Math.round((subTasks.filter((s) => s.completed).length / subTasks.length) * 100) : 0}%`,
+                    }}
+                  />
+                )}
+              </div>
+              {subTasksLoading ? (
+                <div className="space-y-1">
+                  {([58, 78, 44] as const).map((w, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2.5 px-3 py-2"
+                    >
+                      <div className="w-3.75 h-3.75 rounded-full bg-white/[0.07] animate-pulse shrink-0" />
+                      <div
+                        className="h-2.5 rounded-full bg-white/[0.07] animate-pulse"
+                        style={{ width: `${w}%` }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {subTasks.map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => handleToggleSub(st)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/4 transition-colors text-left"
+                    >
+                      {st.completed ? (
+                        <CheckCircle2
+                          size={15}
+                          className="text-emerald-400/60 shrink-0"
+                        />
+                      ) : (
+                        <Circle size={15} className="text-white/20 shrink-0" />
+                      )}
+                      <span
+                        className={`text-sm ${
+                          st.completed
+                            ? "line-through text-white/30"
+                            : "text-white/70"
+                        }`}
+                      >
+                        {st.title}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -145,7 +258,7 @@ export function TaskPreviewModal({ task, onClose, onEdit }: Props) {
           )}
 
           {/* Timestamps */}
-          <div className="pt-2 border-t border-white/[0.06] flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-[11px] text-white/20">
+          <div className="pt-2 border-t border-white/6 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-[11px] text-white/20">
             <span>
               Created{" "}
               {format(parseISO(t.created_at), "MMM d, yyyy 'at' h:mm a")}
@@ -161,7 +274,7 @@ export function TaskPreviewModal({ task, onClose, onEdit }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/[0.08] rounded-xl hover:bg-white/[0.04] hover:text-white/55 transition-all duration-200 focus-ring"
+              className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/8 rounded-xl hover:bg-white/4 hover:text-white/55 transition-all duration-200 focus-ring"
             >
               Close
             </button>

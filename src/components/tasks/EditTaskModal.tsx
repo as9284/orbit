@@ -5,16 +5,30 @@ import {
   validateTaskTitle,
   validateTaskDescription,
 } from "../../lib/validations";
-import { AlignLeft, Flag } from "lucide-react";
+import {
+  AlignLeft,
+  Flag,
+  Plus,
+  X,
+  ListChecks,
+  Circle,
+  CheckCircle2,
+} from "lucide-react";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import { DatePicker } from "../ui/DatePicker";
-import type { Task } from "../../types/database.types";
-import type { CreateTaskData } from "../../hooks/useTasks";
+import type { Task, SubTask } from "../../types/database.types";
+import type { CreateTaskData, SubTaskInput } from "../../hooks/useTasks";
 
 interface Props {
   task: Task | null;
   onClose: () => void;
-  onSave: (id: string, data: CreateTaskData) => Promise<boolean>;
+  onSave: (
+    id: string,
+    data: CreateTaskData,
+    subTasks: SubTaskInput[],
+    existingSubTaskIds: string[],
+  ) => Promise<boolean>;
+  fetchSubTasks: (taskId: string) => Promise<SubTask[]>;
 }
 
 const PRIORITIES: {
@@ -46,7 +60,7 @@ const PRIORITIES: {
   },
 ];
 
-export function EditTaskModal({ task, onClose, onSave }: Props) {
+export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
   const [title, setTitle] = useState(task?.title ?? "");
   const [desc, setDesc] = useState(task?.description ?? "");
   const [priority, setPriority] = useState<"low" | "medium" | "high">(
@@ -55,6 +69,9 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
   const [dueDate, setDueDate] = useState(
     task?.due_date ? task.due_date.split("T")[0] : "",
   );
+  const [subTasks, setSubTasks] = useState<SubTaskInput[]>([]);
+  const [existingSubTaskIds, setExistingSubTaskIds] = useState<string[]>([]);
+  const [newSubTask, setNewSubTask] = useState("");
   const [errors, setErrors] = useState<{ title?: string; desc?: string }>({});
   const [loading, setLoading] = useState(false);
 
@@ -67,8 +84,39 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
       setDueDate(task.due_date ? task.due_date.split("T")[0] : "");
       setErrors({});
       setLoading(false);
+      setNewSubTask("");
+      // Load sub-tasks
+      fetchSubTasks(task.id).then((sts) => {
+        setSubTasks(
+          sts.map((s) => ({
+            id: s.id,
+            title: s.title,
+            completed: s.completed,
+          })),
+        );
+        setExistingSubTaskIds(sts.map((s) => s.id));
+      });
     }
   }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const addSubTask = () => {
+    const text = newSubTask.trim();
+    if (!text || text.length > 200) return;
+    setSubTasks((prev) => [...prev, { title: text, completed: false }]);
+    setNewSubTask("");
+  };
+
+  const removeSubTask = (index: number) => {
+    setSubTasks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const toggleSubTask = (index: number) => {
+    setSubTasks((prev) =>
+      prev.map((st, i) =>
+        i === index ? { ...st, completed: !st.completed } : st,
+      ),
+    );
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -82,12 +130,17 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
       return;
     }
     setLoading(true);
-    const ok = await onSave(task.id, {
-      title,
-      description: desc || undefined,
-      priority,
-      due_date: dueDate || null,
-    });
+    const ok = await onSave(
+      task.id,
+      {
+        title,
+        description: desc || undefined,
+        priority,
+        due_date: dueDate || null,
+      },
+      subTasks,
+      existingSubTaskIds,
+    );
     setLoading(false);
     if (ok) onClose();
   };
@@ -140,6 +193,92 @@ export function EditTaskModal({ task, onClose, onSave }: Props) {
           {errors.desc && (
             <p className="mt-1 text-[11px] text-red-400">{errors.desc}</p>
           )}
+        </div>
+
+        {/* Sub-tasks */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-2 text-white/30">
+            <ListChecks size={12} />
+            <span className="text-[10px] font-semibold uppercase tracking-widest">
+              Sub-tasks
+            </span>
+            {subTasks.length > 0 && (
+              <span className="text-[10px] text-white/20 ml-auto">
+                {subTasks.filter((s) => s.completed).length}/{subTasks.length}
+              </span>
+            )}
+          </div>
+          {subTasks.length > 0 && (
+            <div className="space-y-1.5 mb-2.5">
+              {subTasks.map((st, i) => (
+                <div
+                  key={st.id ?? `new-${i}`}
+                  className="flex items-center gap-2 px-3 py-2 bg-white/[0.04] border border-white/[0.07] rounded-lg group"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleSubTask(i)}
+                    className={`shrink-0 transition-colors ${
+                      st.completed
+                        ? "text-emerald-400/60 hover:text-emerald-400/90"
+                        : "text-white/20 hover:text-white/50"
+                    }`}
+                    aria-label={
+                      st.completed ? "Mark incomplete" : "Mark complete"
+                    }
+                  >
+                    {st.completed ? (
+                      <CheckCircle2 size={15} />
+                    ) : (
+                      <Circle size={15} />
+                    )}
+                  </button>
+                  <span
+                    className={`flex-1 text-sm truncate ${
+                      st.completed
+                        ? "line-through text-white/30"
+                        : "text-white/70"
+                    }`}
+                  >
+                    {st.title}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeSubTask(i)}
+                    className="p-0.5 rounded text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                    aria-label="Remove sub-task"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Add a sub-task…"
+              value={newSubTask}
+              maxLength={200}
+              onChange={(e) => setNewSubTask(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addSubTask();
+                }
+              }}
+              className="flex-1 min-w-0 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/85 placeholder:text-white/25 outline-none focus:border-violet-500/35 transition-colors"
+            />
+            <button
+              type="button"
+              onClick={addSubTask}
+              disabled={!newSubTask.trim()}
+              className="px-3 py-2 rounded-lg border border-white/[0.08] text-white/40 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-default transition-all"
+              aria-label="Add sub-task"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Priority */}

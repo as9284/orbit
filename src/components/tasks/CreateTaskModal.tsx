@@ -6,14 +6,17 @@ import {
   validateTaskTitle,
   validateTaskDescription,
 } from "../../lib/validations";
-import { AlignLeft, Flag } from "lucide-react";
+import { AlignLeft, Flag, Plus, X, ListChecks } from "lucide-react";
 import { RichTextEditor } from "../ui/RichTextEditor";
-import type { CreateTaskData } from "../../hooks/useTasks";
+import type { CreateTaskData, SubTaskInput } from "../../hooks/useTasks";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreate: (data: CreateTaskData) => Promise<boolean>;
+  onCreate: (
+    data: CreateTaskData,
+    subTasks: SubTaskInput[],
+  ) => Promise<boolean>;
 }
 
 const PRIORITIES: {
@@ -50,6 +53,8 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
   const [desc, setDesc] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [dueDate, setDueDate] = useState("");
+  const [subTasks, setSubTasks] = useState<SubTaskInput[]>([]);
+  const [newSubTask, setNewSubTask] = useState("");
   const [errors, setErrors] = useState<{
     title?: string;
     desc?: string;
@@ -62,12 +67,25 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
     setDesc("");
     setPriority("medium");
     setDueDate("");
+    setSubTasks([]);
+    setNewSubTask("");
     setErrors({});
   };
 
   const handleClose = () => {
     reset();
     onClose();
+  };
+
+  const addSubTask = () => {
+    const text = newSubTask.trim();
+    if (!text || text.length > 200) return;
+    setSubTasks((prev) => [...prev, { title: text }]);
+    setNewSubTask("");
+  };
+
+  const removeSubTask = (index: number) => {
+    setSubTasks((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -84,12 +102,15 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
       return;
     }
     setLoading(true);
-    const ok = await onCreate({
-      title,
-      description: desc || undefined,
-      priority,
-      due_date: dueDate || null,
-    });
+    const ok = await onCreate(
+      {
+        title,
+        description: desc || undefined,
+        priority,
+        due_date: dueDate || null,
+      },
+      subTasks,
+    );
     setLoading(false);
     if (ok) handleClose();
   };
@@ -142,6 +163,63 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
           {errors.desc && (
             <p className="mt-1 text-[11px] text-red-400">{errors.desc}</p>
           )}
+        </div>
+
+        {/* Sub-tasks */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-2 text-white/30">
+            <ListChecks size={12} />
+            <span className="text-[10px] font-semibold uppercase tracking-widest">
+              Sub-tasks
+            </span>
+          </div>
+          {subTasks.length > 0 && (
+            <div className="space-y-1.5 mb-2.5">
+              {subTasks.map((st, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 px-3 py-2 bg-white/[0.04] border border-white/[0.07] rounded-lg group"
+                >
+                  <span className="flex-1 text-sm text-white/70 truncate">
+                    {st.title}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeSubTask(i)}
+                    className="p-0.5 rounded text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                    aria-label="Remove sub-task"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Add a sub-task…"
+              value={newSubTask}
+              maxLength={200}
+              onChange={(e) => setNewSubTask(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addSubTask();
+                }
+              }}
+              className="flex-1 min-w-0 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/85 placeholder:text-white/25 outline-none focus:border-violet-500/35 transition-colors"
+            />
+            <button
+              type="button"
+              onClick={addSubTask}
+              disabled={!newSubTask.trim()}
+              className="px-3 py-2 rounded-lg border border-white/[0.08] text-white/40 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-default transition-all"
+              aria-label="Add sub-task"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Priority */}

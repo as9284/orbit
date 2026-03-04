@@ -351,7 +351,76 @@ function SecurityTab() {
           .update({ title: encTitle, description: encDesc })
           .eq("id", task.id);
         if (updateErr) {
-          // Partial re-encryption — save what we have and surface the error
+          await supabase
+            .from("profiles")
+            .update({ encryption_salt: newSalt })
+            .eq("id", user!.id);
+          await setEncryptionKey(newKey);
+          setLoading(false);
+          setErrors({
+            current:
+              "Re-encryption failed partway. Please sign out and sign back in.",
+          });
+          return;
+        }
+      }
+    }
+
+    // 5b. Re-encrypt all sub-tasks
+    const { data: allSubTasks } = await supabase
+      .from("sub_tasks")
+      .select("id, title")
+      .eq("user_id", user!.id);
+    if (allSubTasks && allSubTasks.length > 0) {
+      setLoadingMsg(
+        `Re-encrypting ${allSubTasks.length} sub-task${allSubTasks.length !== 1 ? "s" : ""}…`,
+      );
+      for (const st of allSubTasks) {
+        const plainTitle = await decrypt(st.title, encryptionKey);
+        const encTitle = await encrypt(plainTitle, newKey);
+        const { error: updateErr } = await supabase
+          .from("sub_tasks")
+          .update({ title: encTitle })
+          .eq("id", st.id);
+        if (updateErr) {
+          await supabase
+            .from("profiles")
+            .update({ encryption_salt: newSalt })
+            .eq("id", user!.id);
+          await setEncryptionKey(newKey);
+          setLoading(false);
+          setErrors({
+            current:
+              "Re-encryption failed partway. Please sign out and sign back in.",
+          });
+          return;
+        }
+      }
+    }
+
+    // 5c. Re-encrypt all notes
+    const { data: allNotes } = await supabase
+      .from("notes")
+      .select("id, title, content")
+      .eq("user_id", user!.id);
+    if (allNotes && allNotes.length > 0) {
+      setLoadingMsg(
+        `Re-encrypting ${allNotes.length} note${allNotes.length !== 1 ? "s" : ""}…`,
+      );
+      for (const note of allNotes) {
+        const plainTitle = await decrypt(note.title, encryptionKey);
+        const encTitle = await encrypt(plainTitle, newKey);
+        const plainContent = note.content
+          ? await decrypt(note.content, encryptionKey)
+          : null;
+        const encContent = plainContent
+          ? await encrypt(plainContent, newKey)
+          : null;
+        const { error: updateErr } = await supabase
+          .from("notes")
+          .update({ title: encTitle, content: encContent })
+          .eq("id", note.id);
+        if (updateErr) {
           await supabase
             .from("profiles")
             .update({ encryption_salt: newSalt })
@@ -465,8 +534,8 @@ function SecurityTab() {
         placeholder="Repeat new password"
       />
       <p className="text-[11px] text-white/25 leading-relaxed">
-        All tasks in your vault will be re-encrypted with a new key derived from
-        your new password.
+        All tasks, sub-tasks, and notes in your vault will be re-encrypted with
+        a new key derived from your new password.
       </p>
       <button
         type="submit"

@@ -84,6 +84,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      sub_tasks: {
+        Row: {
+          id: string;
+          task_id: string;
+          user_id: string;
+          title: string;
+          completed: boolean;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          task_id: string;
+          user_id: string;
+          title: string;
+          completed?: boolean;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          task_id?: string;
+          user_id?: string;
+          title?: string;
+          completed?: boolean;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      notes: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          content: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          content?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          content?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -138,3 +198,5 @@ export type Tables<
 // Convenience row types
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Task = Database["public"]["Tables"]["tasks"]["Row"];
+export type SubTask = Database["public"]["Tables"]["sub_tasks"]["Row"];
+export type Note = Database["public"]["Tables"]["notes"]["Row"];

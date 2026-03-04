@@ -99,3 +99,18 @@ function inlineFormat(text: string): React.ReactNode {
   }
   return parts.length === 1 ? parts[0] : parts;
 }
+
+/**
+ * Strips markdown syntax and returns plain text, suitable for compact
+ * card previews where inline formatting is not needed.
+ */
+export function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1") // **bold**
+    .replace(/\*(.+?)\*/g, "$1") // *italic*
+    .replace(/~~(.+?)~~/g, "$1") // ~~strikethrough~~
+    .replace(/^[-*]\s+/gm, "") // unordered list markers
+    .replace(/^\d+\.\s+/gm, "") // ordered list markers
+    .replace(/\n+/g, " ") // collapse newlines to spaces
+    .trim();
+}

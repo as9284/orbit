@@ -19,6 +19,7 @@ import { EditTaskModal } from "../components/tasks/EditTaskModal";
 import { TaskPreviewModal } from "../components/tasks/TaskPreviewModal";
 import { Spinner } from "../components/ui/Spinner";
 import type { Task } from "../types/database.types";
+import type { SubTaskInput } from "../hooks/useTasks";
 
 type Filter = "all" | "active" | "completed" | "overdue";
 type Sort = "recent" | "priority" | "due";
@@ -131,20 +132,35 @@ export function DashboardPage() {
     return tasks;
   }, [api.activeTasks, filter, sort]);
 
-  const handleCreate = async (data: Parameters<typeof api.createTask>[0]) => {
-    const ok = await api.createTask(data);
-    if (ok) toast.success("Task created");
-    else toast.error("Failed to create task");
-    return ok;
+  const handleCreate = async (
+    data: Parameters<typeof api.createTask>[0],
+    subTasks: SubTaskInput[],
+  ) => {
+    const taskId = await api.createTask(data);
+    if (taskId) {
+      if (subTasks.length > 0) {
+        await api.saveSubTasks(taskId, subTasks, []);
+      }
+      toast.success("Task created");
+    } else {
+      toast.error("Failed to create task");
+    }
+    return !!taskId;
   };
 
   const handleSave = async (
     id: string,
     data: Parameters<typeof api.updateTask>[1],
+    subTasks: SubTaskInput[],
+    existingSubTaskIds: string[],
   ) => {
     const ok = await api.updateTask(id, data);
-    if (ok) toast.success("Task updated");
-    else toast.error("Failed to update task");
+    if (ok) {
+      await api.saveSubTasks(id, subTasks, existingSubTaskIds);
+      toast.success("Task updated");
+    } else {
+      toast.error("Failed to update task");
+    }
     return ok;
   };
 
@@ -357,6 +373,7 @@ export function DashboardPage() {
         task={editTask}
         onClose={() => setEditTask(null)}
         onSave={handleSave}
+        fetchSubTasks={api.fetchSubTasks}
       />
       <TaskPreviewModal
         task={previewTask}
@@ -365,6 +382,8 @@ export function DashboardPage() {
           setPreviewTask(null);
           setEditTask(t);
         }}
+        fetchSubTasks={api.fetchSubTasks}
+        onToggleSubTask={api.toggleSubTaskComplete}
       />
     </div>
   );

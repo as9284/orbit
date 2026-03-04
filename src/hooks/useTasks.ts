@@ -1,13 +1,19 @@
 import { useState, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { encrypt, decrypt } from "../lib/encryption";
-import type { Task } from "../types/database.types";
+import type { Task, SubTask } from "../types/database.types";
 
 export interface CreateTaskData {
   title: string;
   description?: string;
   priority?: "low" | "medium" | "high";
   due_date?: string | null;
+}
+
+export interface SubTaskInput {
+  id?: string;
+  title: string;
+  completed?: boolean;
 }
 
 async function decryptTask(task: Task, key: CryptoKey): Promise<Task> {
@@ -20,6 +26,17 @@ async function decryptTask(task: Task, key: CryptoKey): Promise<Task> {
 
 async function decryptTasks(tasks: Task[], key: CryptoKey): Promise<Task[]> {
   return Promise.all(tasks.map((t) => decryptTask(t, key)));
+}
+
+async function decryptSubTask(st: SubTask, key: CryptoKey): Promise<SubTask> {
+  return { ...st, title: await decrypt(st.title, key) };
+}
+
+async function decryptSubTasks(
+  sts: SubTask[],
+  key: CryptoKey,
+): Promise<SubTask[]> {
+  return Promise.all(sts.map((s) => decryptSubTask(s, key)));
 }
 
 export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
@@ -69,25 +86,29 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
     setLoadingArchived(false);
   }, [userId, encryptionKey]);
 
-  const createTask = async (data: CreateTaskData): Promise<boolean> => {
-    if (!encryptionKey) return false;
+  const createTask = async (data: CreateTaskData): Promise<string | null> => {
+    if (!encryptionKey) return null;
     const encTitle = await encrypt(data.title.trim(), encryptionKey);
     const encDesc = data.description?.trim()
       ? await encrypt(data.description.trim(), encryptionKey)
       : null;
-    const { error } = await supabase.from("tasks").insert({
-      user_id: userId,
-      title: encTitle,
-      description: encDesc,
-      priority: data.priority ?? "medium",
-      due_date: data.due_date || null,
-    });
+    const { data: inserted, error } = await supabase
+      .from("tasks")
+      .insert({
+        user_id: userId,
+        title: encTitle,
+        description: encDesc,
+        priority: data.priority ?? "medium",
+        due_date: data.due_date || null,
+      })
+      .select("id")
+      .single();
     if (error) {
       setError(error.message);
-      return false;
+      return null;
     }
     await fetchActiveTasks();
-    return true;
+    return inserted.id;
   };
 
   const updateTask = async (
@@ -175,6 +196,97 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
     return true;
   };
 
+  // ── Sub-tasks ─────────────────────────────────────────────────────────
+
+  const fetchSubTasks = async (taskId: string): Promise<SubTask[]> => {
+    if (!encryptionKey) return [];
+    const { data, error } = await supabase
+      .from("sub_tasks")
+      .select("*")
+      .eq("task_id", taskId)
+      .order("position", { ascending: true });
+    if (error) {
+      setError(error.message);
+      return [];
+    }
+    return decryptSubTasks(data ?? [], encryptionKey);
+  };
+
+  const saveSubTasks = async (
+    taskId: string,
+    subTasks: SubTaskInput[],
+    existingIds: string[],
+  ): Promise<boolean> => {
+    if (!encryptionKey) return false;
+
+    // Determine which existing sub-tasks to delete
+    const newIds = subTasks.filter((s) => s.id).map((s) => s.id!);
+    const toDelete = existingIds.filter((id) => !newIds.includes(id));
+
+    // Delete removed sub-tasks
+    if (toDelete.length > 0) {
+      const { error } = await supabase
+        .from("sub_tasks")
+        .delete()
+        .in("id", toDelete);
+      if (error) {
+        setError(error.message);
+        return false;
+      }
+    }
+
+    // Upsert remaining
+    for (let i = 0; i < subTasks.length; i++) {
+      const st = subTasks[i];
+      const encTitle = await encrypt(st.title.trim(), encryptionKey);
+
+      if (st.id) {
+        // Update existing
+        const { error } = await supabase
+          .from("sub_tasks")
+          .update({
+            title: encTitle,
+            completed: st.completed ?? false,
+            position: i,
+          })
+          .eq("id", st.id);
+        if (error) {
+          setError(error.message);
+          return false;
+        }
+      } else {
+        // Insert new
+        const { error } = await supabase.from("sub_tasks").insert({
+          task_id: taskId,
+          user_id: userId,
+          title: encTitle,
+          completed: st.completed ?? false,
+          position: i,
+        });
+        if (error) {
+          setError(error.message);
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const toggleSubTaskComplete = async (
+    subTaskId: string,
+    completed: boolean,
+  ): Promise<boolean> => {
+    const { error } = await supabase
+      .from("sub_tasks")
+      .update({ completed })
+      .eq("id", subTaskId);
+    if (error) {
+      setError(error.message);
+      return false;
+    }
+    return true;
+  };
+
   return {
     activeTasks,
     archivedTasks,
@@ -189,6 +301,9 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
     archiveTask,
     unarchiveTask,
     deleteForever,
+    fetchSubTasks,
+    saveSubTasks,
+    toggleSubTaskComplete,
   };
 }
 

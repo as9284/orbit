@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { stripMarkdown } from "../../lib/markdown";
 import { format, isPast, isToday, parseISO, isTomorrow } from "date-fns";
 import { Circle, CheckCircle2, Archive, Pencil, Calendar } from "lucide-react";
 import type { Task } from "../../types/database.types";
@@ -66,8 +67,8 @@ export function TaskCard({
     <div
       className={`group flex items-start gap-3 px-4 py-3.5 rounded-xl border-l-2 border border-white/[0.07] transition-all duration-200 ${priority.border} ${
         task.completed
-          ? "bg-white/[0.015] opacity-50"
-          : "bg-white/[0.03] hover:bg-white/[0.055] hover:border-white/[0.11] hover:-translate-y-px hover:shadow-lg hover:shadow-black/20"
+          ? "bg-white/1.5 opacity-50"
+          : "bg-white/3 hover:bg-white/5.5 hover:border-white/11 hover:-translate-y-px hover:shadow-lg hover:shadow-black/20"
       }`}
     >
       {/* Checkbox — oversized hit area for easier toggling */}
@@ -106,7 +107,7 @@ export function TaskCard({
         </p>
         {task.description && (
           <p className="mt-0.5 text-xs text-white/30 line-clamp-1 leading-relaxed">
-            {task.description}
+            {stripMarkdown(task.description)}
           </p>
         )}
         <div className="flex items-center gap-3 mt-2">
