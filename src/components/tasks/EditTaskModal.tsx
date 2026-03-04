@@ -165,7 +165,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
             className={`w-full bg-transparent text-white text-base font-medium placeholder:text-white/25 outline-none border-b pb-2.5 transition-colors duration-200 ${
               errors.title
                 ? "border-red-500/40"
-                : "border-white/[0.09] focus:border-violet-500/40"
+                : "border-white/9 focus:border-violet-500/40"
             }`}
           />
           {errors.title && (
@@ -213,7 +213,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
               {subTasks.map((st, i) => (
                 <div
                   key={st.id ?? `new-${i}`}
-                  className="flex items-center gap-2 px-3 py-2 bg-white/[0.04] border border-white/[0.07] rounded-lg group"
+                  className="flex items-center gap-2 px-3 py-2 bg-white/4 border border-white/7 rounded-lg group"
                 >
                   <button
                     type="button"
@@ -267,13 +267,13 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
                   addSubTask();
                 }
               }}
-              className="flex-1 min-w-0 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/85 placeholder:text-white/25 outline-none focus:border-violet-500/35 transition-colors"
+              className="flex-1 min-w-0 bg-white/4 border border-white/8 rounded-lg px-3 py-2 text-sm text-white/85 placeholder:text-white/25 outline-none focus:border-violet-500/35 transition-colors"
             />
             <button
               type="button"
               onClick={addSubTask}
               disabled={!newSubTask.trim()}
-              className="px-3 py-2 rounded-lg border border-white/[0.08] text-white/40 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-default transition-all"
+              className="px-3 py-2 rounded-lg border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/6 disabled:opacity-30 disabled:cursor-default transition-all"
               aria-label="Add sub-task"
             >
               <Plus size={14} />
@@ -325,7 +325,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/[0.08] rounded-xl hover:bg-white/[0.04] hover:text-white/55 transition-all duration-200 focus-ring"
+            className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/8 rounded-xl hover:bg-white/4 hover:text-white/55 transition-all duration-200 focus-ring"
           >
             Cancel
           </button>

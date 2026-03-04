@@ -13,7 +13,7 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-orbit-950">
+      <div className="min-h-screen flex items-center justify-center bg-orbit-950">
         <Spinner size={28} className="text-white/20" />
       </div>
     );

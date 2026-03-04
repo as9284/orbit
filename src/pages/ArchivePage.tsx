@@ -11,7 +11,7 @@ import { format, parseISO } from "date-fns";
 import { useTasksApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
 import { Spinner } from "../components/ui/Spinner";
-import { Modal } from "../components/ui/Modal";
+import { ConfirmModal } from "../components/ui/ConfirmModal";
 import type { Task } from "../types/database.types";
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -75,7 +75,7 @@ export function ArchivePage() {
         {api.archivedTasks.length > 0 && (
           <button
             onClick={() => setConfirmDelete("__all__")}
-            className="flex items-center gap-1.5 px-3.5 py-2 border border-red-500/25 text-red-400/75 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/[0.06] rounded-xl text-xs font-semibold transition-all duration-200 focus-ring"
+            className="flex items-center gap-1.5 px-3.5 py-2 border border-red-500/25 text-red-400/75 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/6 rounded-xl text-xs font-semibold transition-all duration-200 focus-ring"
           >
             <Trash2 size={13} />
             Clear all
@@ -84,7 +84,7 @@ export function ArchivePage() {
       </div>
 
       {/* Info banner */}
-      <div className="flex items-start gap-2.5 p-3.5 mb-6 bg-white/[0.03] border border-white/[0.06] rounded-xl text-xs text-white/35">
+      <div className="flex items-start gap-2.5 p-3.5 mb-6 bg-white/3 border border-white/6 rounded-xl text-xs text-white/35">
         <Archive size={13} className="mt-0.5 shrink-0 text-violet-400/40" />
         Archived tasks are hidden from your dashboard. You can restore them or
         delete them permanently.
@@ -97,7 +97,7 @@ export function ArchivePage() {
         </div>
       ) : api.archivedTasks.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center animate-scale-in">
-          <div className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/[0.07] flex items-center justify-center mb-4 animate-float">
+          <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/7 flex items-center justify-center mb-4 animate-float">
             <Archive size={20} className="text-white/25" />
           </div>
           <p className="text-white/30 text-sm">Archive is empty</p>
@@ -130,11 +130,13 @@ export function ArchivePage() {
       )}
 
       {/* Confirm clear-all dialog */}
-      <ConfirmDialog
+      <ConfirmModal
         open={confirmDelete === "__all__"}
+        onClose={() => setConfirmDelete(null)}
+        title="Confirm deletion"
         message={`Permanently delete all ${api.archivedTasks.length} archived tasks? This cannot be undone.`}
+        confirmLabel="Delete all"
         onConfirm={handleClearAll}
-        onCancel={() => setConfirmDelete(null)}
       />
     </div>
   );
@@ -168,7 +170,7 @@ function ArchivedTaskRow({
 
   return (
     <div
-      className={`group flex flex-col sm:flex-row sm:items-start gap-3 px-4 py-3.5 rounded-xl border border-l-2 bg-white/[0.025] border-white/[0.06] hover:bg-white/[0.045] hover:border-white/[0.09] transition-all duration-200 ${borderColor}`}
+      className={`group flex flex-col sm:flex-row sm:items-start gap-3 px-4 py-3.5 rounded-xl border border-l-2 bg-white/2.5 border-white/6 hover:bg-white/4.5 hover:border-white/9 transition-all duration-200 ${borderColor}`}
     >
       <div className="flex items-start gap-3 flex-1 min-w-0">
         {/* Priority dot */}
@@ -215,7 +217,7 @@ function ArchivedTaskRow({
             onClick={onUnarchive}
             title="Restore task"
             aria-label="Restore task"
-            className="p-2 sm:p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.07] transition-colors focus-ring"
+            className="p-2 sm:p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/7 transition-colors focus-ring"
           >
             <ArchiveRestore size={14} />
           </button>
@@ -223,7 +225,7 @@ function ArchivedTaskRow({
             onClick={onRequestDelete}
             title="Delete permanently"
             aria-label="Delete permanently"
-            className="p-2 sm:p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/[0.08] transition-colors focus-ring"
+            className="p-2 sm:p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/8 transition-colors focus-ring"
           >
             <Trash2 size={14} />
           </button>
@@ -249,51 +251,5 @@ function ArchivedTaskRow({
         </div>
       )}
     </div>
-  );
-}
-
-function ConfirmDialog({
-  open,
-  message,
-  onConfirm,
-  onCancel,
-}: {
-  open: boolean;
-  message: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <Modal
-      open={open}
-      onClose={onCancel}
-      title="Confirm deletion"
-      maxWidth="max-w-sm"
-    >
-      <div className="space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0 mt-0.5">
-            <AlertTriangle size={16} className="text-red-400" />
-          </div>
-          <p className="text-xs text-white/45 leading-relaxed pt-1">
-            {message}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-2.5 text-sm font-medium text-white/45 border border-white/[0.08] rounded-xl hover:bg-white/[0.04] transition-colors focus-ring"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 py-2.5 text-sm font-semibold bg-red-500 text-white rounded-xl hover:bg-red-500/90 active:scale-[0.98] transition-all focus-ring"
-          >
-            Delete all
-          </button>
-        </div>
-      </div>
-    </Modal>
   );
 }

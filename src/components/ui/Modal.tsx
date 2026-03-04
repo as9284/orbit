@@ -53,6 +53,15 @@ export function Modal({
     };
   }, [mounted]);
 
+  // Body scroll lock
+  useEffect(() => {
+    if (!mounted) return;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mounted]);
+
   // Escape key
   useEffect(() => {
     if (!mounted) return;
@@ -116,7 +125,7 @@ export function Modal({
       {/* Panel */}
       <div
         ref={panelRef}
-        className={`relative w-full ${maxWidth} bg-orbit-800 border border-white/[0.09] rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/60 max-h-[92dvh] flex flex-col transition-all duration-200 ease-out ${
+        className={`relative w-full ${maxWidth} bg-orbit-800 border border-white/9 rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/60 max-h-[92dvh] flex flex-col transition-all duration-200 ease-out ${
           visible
             ? "opacity-100 scale-100 translate-y-0"
             : "opacity-0 scale-[0.96] translate-y-3"
@@ -126,7 +135,7 @@ export function Modal({
         {/* Top glow accent */}
         <div className="absolute -top-px left-1/5 right-1/5 h-px bg-linear-to-r from-transparent via-violet-400/25 to-transparent" />
 
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/[0.06] shrink-0">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/6 shrink-0">
           <h2
             id="modal-title"
             className="text-sm font-semibold text-white/90 tracking-tight"

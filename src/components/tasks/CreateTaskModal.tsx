@@ -28,23 +28,23 @@ const PRIORITIES: {
   {
     value: "low",
     label: "Low",
-    idle: "text-white/35 border-white/[0.08] hover:border-blue-500/25 hover:bg-blue-500/[0.04]",
+    idle: "text-white/35 border-white/8 hover:border-blue-500/25 hover:bg-blue-500/4",
     active:
-      "text-blue-400 border-blue-500/35 bg-blue-500/[0.1] shadow-[inset_0_0_0_1px_rgba(59,130,246,0.12)]",
+      "text-blue-400 border-blue-500/35 bg-blue-500/10 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.12)]",
   },
   {
     value: "medium",
     label: "Medium",
-    idle: "text-white/35 border-white/[0.08] hover:border-amber-500/25 hover:bg-amber-500/[0.04]",
+    idle: "text-white/35 border-white/8 hover:border-amber-500/25 hover:bg-amber-500/4",
     active:
-      "text-amber-400 border-amber-500/35 bg-amber-500/[0.1] shadow-[inset_0_0_0_1px_rgba(245,158,11,0.12)]",
+      "text-amber-400 border-amber-500/35 bg-amber-500/10 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.12)]",
   },
   {
     value: "high",
     label: "High",
-    idle: "text-white/35 border-white/[0.08] hover:border-rose-500/25 hover:bg-rose-500/[0.04]",
+    idle: "text-white/35 border-white/8 hover:border-rose-500/25 hover:bg-rose-500/4",
     active:
-      "text-rose-400 border-rose-500/35 bg-rose-500/[0.1] shadow-[inset_0_0_0_1px_rgba(244,63,94,0.12)]",
+      "text-rose-400 border-rose-500/35 bg-rose-500/10 shadow-[inset_0_0_0_1px_rgba(244,63,94,0.12)]",
   },
 ];
 
@@ -135,7 +135,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
             className={`w-full bg-transparent text-white text-base font-medium placeholder:text-white/25 outline-none border-b pb-2.5 transition-colors duration-200 ${
               errors.title
                 ? "border-red-500/40"
-                : "border-white/[0.09] focus:border-violet-500/40"
+                : "border-white/9 focus:border-violet-500/40"
             }`}
           />
           {errors.title && (
@@ -178,7 +178,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
               {subTasks.map((st, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-2 px-3 py-2 bg-white/[0.04] border border-white/[0.07] rounded-lg group"
+                  className="flex items-center gap-2 px-3 py-2 bg-white/4 border border-white/7 rounded-lg group"
                 >
                   <span className="flex-1 text-sm text-white/70 truncate">
                     {st.title}
@@ -208,13 +208,13 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
                   addSubTask();
                 }
               }}
-              className="flex-1 min-w-0 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/85 placeholder:text-white/25 outline-none focus:border-violet-500/35 transition-colors"
+              className="flex-1 min-w-0 bg-white/4 border border-white/8 rounded-lg px-3 py-2 text-sm text-white/85 placeholder:text-white/25 outline-none focus:border-violet-500/35 transition-colors"
             />
             <button
               type="button"
               onClick={addSubTask}
               disabled={!newSubTask.trim()}
-              className="px-3 py-2 rounded-lg border border-white/[0.08] text-white/40 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-default transition-all"
+              className="px-3 py-2 rounded-lg border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/6 disabled:opacity-30 disabled:cursor-default transition-all"
               aria-label="Add sub-task"
             >
               <Plus size={14} />
@@ -273,7 +273,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
           <button
             type="button"
             onClick={handleClose}
-            className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/[0.08] rounded-xl hover:bg-white/[0.04] hover:text-white/55 transition-all duration-200 focus-ring"
+            className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/8 rounded-xl hover:bg-white/4 hover:text-white/55 transition-all duration-200 focus-ring"
           >
             Cancel
           </button>
