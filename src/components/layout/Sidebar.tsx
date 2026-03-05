@@ -1,17 +1,11 @@
 import { NavLink } from "react-router-dom";
-import {
-  LayoutDashboard,
-  Archive,
-  LogOut,
-  Settings,
-  StickyNote,
-} from "lucide-react";
+import { ListTodo, Archive, LogOut, Settings, StickyNote } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { SettingsModal } from "../settings/SettingsModal";
 
 const NAV = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/" },
+  { icon: ListTodo, label: "Tasks", to: "/" },
   { icon: StickyNote, label: "Notes", to: "/notes" },
   { icon: Archive, label: "Archive", to: "/archive" },
 ];

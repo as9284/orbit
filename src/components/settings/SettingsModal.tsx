@@ -252,16 +252,13 @@ function AccountTab() {
 
 function SecurityTab() {
   const { user, encryptionKey, setEncryptionKey } = useAuth();
-  const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
-  const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [errors, setErrors] = useState<{
-    current?: string;
     new?: string;
     confirm?: string;
   }>({});
@@ -270,37 +267,18 @@ function SecurityTab() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const errs: typeof errors = {
-      current: !currentPwd ? "Current password is required." : undefined,
       new: validatePassword(newPwd) ?? undefined,
       confirm: newPwd !== confirmPwd ? "Passwords do not match." : undefined,
     };
-    if (errs.current || errs.new || errs.confirm) {
+    if (errs.new || errs.confirm) {
       setErrors(errs);
-      return;
-    }
-    if (currentPwd === newPwd) {
-      setErrors({
-        new: "New password must be different from your current one.",
-      });
       return;
     }
 
     setLoading(true);
     setErrors({});
 
-    // 1. Verify current password via re-auth
-    setLoadingMsg("Verifying password…");
-    const { error: authErr } = await supabase.auth.signInWithPassword({
-      email: user!.email!,
-      password: currentPwd,
-    });
-    if (authErr) {
-      setLoading(false);
-      setErrors({ current: "Incorrect password." });
-      return;
-    }
-
-    // 2. Fetch stored salt
+    // 1. Fetch stored salt
     const { data: profile } = await supabase
       .from("profiles")
       .select("encryption_salt")
@@ -462,7 +440,6 @@ function SecurityTab() {
     await setEncryptionKey(newKey);
 
     setLoading(false);
-    setCurrentPwd("");
     setNewPwd("");
     setConfirmPwd("");
     setSuccess(true);
@@ -494,19 +471,6 @@ function SecurityTab() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
-      <PasswordField
-        label="Current password"
-        value={currentPwd}
-        onChange={(v) => {
-          setCurrentPwd(v);
-          setErrors((p) => ({ ...p, current: undefined }));
-        }}
-        show={showCurrent}
-        onToggleShow={() => setShowCurrent((v) => !v)}
-        error={errors.current}
-        autoComplete="current-password"
-        placeholder="Your current password"
-      />
       <PasswordField
         label="New password"
         value={newPwd}
