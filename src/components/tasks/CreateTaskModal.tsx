@@ -6,9 +6,19 @@ import {
   validateTaskTitle,
   validateTaskDescription,
 } from "../../lib/validations";
-import { AlignLeft, Flag, Plus, X, ListChecks } from "lucide-react";
+import {
+  AlignLeft,
+  Flag,
+  Plus,
+  X,
+  ListChecks,
+  GripVertical,
+} from "lucide-react";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import type { CreateTaskData, SubTaskInput } from "../../hooks/useTasks";
+
+// Local subtask with stable local id for drag tracking
+type LocalSubTaskCreate = { title: string; _lid: string };
 
 interface Props {
   open: boolean;
@@ -53,7 +63,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
   const [desc, setDesc] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [dueDate, setDueDate] = useState("");
-  const [subTasks, setSubTasks] = useState<SubTaskInput[]>([]);
+  const [subTasks, setSubTasks] = useState<LocalSubTaskCreate[]>([]);
   const [newSubTask, setNewSubTask] = useState("");
   const [errors, setErrors] = useState<{
     title?: string;
@@ -61,6 +71,13 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
     dueDate?: string;
   }>({});
   const [loading, setLoading] = useState(false);
+
+  // Drag state for subtask reordering
+  const [dragLid, setDragLid] = useState<string | null>(null);
+  const [dragOverInfo, setDragOverInfo] = useState<{
+    lid: string;
+    insertBefore: boolean;
+  } | null>(null);
 
   const reset = () => {
     setTitle("");
@@ -70,6 +87,8 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
     setSubTasks([]);
     setNewSubTask("");
     setErrors({});
+    setDragLid(null);
+    setDragOverInfo(null);
   };
 
   const handleClose = () => {
@@ -80,12 +99,67 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
   const addSubTask = () => {
     const text = newSubTask.trim();
     if (!text || text.length > 200) return;
-    setSubTasks((prev) => [...prev, { title: text }]);
+    setSubTasks((prev) => [
+      ...prev,
+      { title: text, _lid: crypto.randomUUID() },
+    ]);
     setNewSubTask("");
   };
 
-  const removeSubTask = (index: number) => {
-    setSubTasks((prev) => prev.filter((_, i) => i !== index));
+  const removeSubTask = (lid: string) => {
+    setSubTasks((prev) => prev.filter((s) => s._lid !== lid));
+  };
+
+  const handleDragStart = (lid: string, e: React.DragEvent) => {
+    setDragLid(lid);
+    e.dataTransfer.effectAllowed = "move";
+    const ghost = document.createElement("div");
+    ghost.style.opacity = "0";
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 0, 0);
+    requestAnimationFrame(() => document.body.removeChild(ghost));
+  };
+
+  const handleDragOver = (e: React.DragEvent, lid: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragLid === lid) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const insertBefore = e.clientY < rect.top + rect.height / 2;
+    setDragOverInfo((prev) =>
+      prev?.lid === lid && prev?.insertBefore === insertBefore
+        ? prev
+        : { lid, insertBefore },
+    );
+  };
+
+  const handleDrop = (targetLid: string) => {
+    if (!dragLid || dragLid === targetLid) {
+      setDragLid(null);
+      setDragOverInfo(null);
+      return;
+    }
+    const insertBefore = dragOverInfo?.insertBefore ?? true;
+    setSubTasks((prev) => {
+      const items = [...prev];
+      const fromIdx = items.findIndex((s) => s._lid === dragLid);
+      if (fromIdx === -1) return items;
+      const [item] = items.splice(fromIdx, 1);
+      const toIdx = items.findIndex((s) => s._lid === targetLid);
+      if (toIdx === -1) {
+        items.push(item);
+        return items;
+      }
+      items.splice(insertBefore ? toIdx : toIdx + 1, 0, item);
+      return items;
+    });
+    setDragLid(null);
+    setDragOverInfo(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragLid(null);
+    setDragOverInfo(null);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -109,7 +183,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
         priority,
         due_date: dueDate || null,
       },
-      subTasks,
+      subTasks.map(({ _lid: _l, ...rest }) => rest),
     );
     setLoading(false);
     if (ok) handleClose();
@@ -172,27 +246,73 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
             <span className="text-[10px] font-semibold uppercase tracking-widest">
               Sub-tasks
             </span>
+            {subTasks.length > 1 && (
+              <span className="text-[10px] text-white/15 ml-auto">
+                drag to reorder
+              </span>
+            )}
           </div>
           {subTasks.length > 0 && (
             <div className="space-y-1.5 mb-2.5">
-              {subTasks.map((st, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 px-3 py-2 bg-white/4 border border-white/7 rounded-lg group"
-                >
-                  <span className="flex-1 text-sm text-white/70 truncate">
-                    {st.title}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeSubTask(i)}
-                    className="p-0.5 rounded text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
-                    aria-label="Remove sub-task"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
+              {subTasks.map((st) => {
+                const isDragging = dragLid === st._lid;
+                const showBefore =
+                  dragOverInfo?.lid === st._lid &&
+                  dragOverInfo.insertBefore &&
+                  dragLid !== st._lid;
+                const showAfter =
+                  dragOverInfo?.lid === st._lid &&
+                  !dragOverInfo.insertBefore &&
+                  dragLid !== st._lid;
+                return (
+                  <div key={st._lid} className="relative">
+                    {showBefore && (
+                      <div className="absolute -top-0.5 left-3 right-3 h-0.5 bg-violet-500/65 rounded-full z-10 animate-fade-in" />
+                    )}
+                    <div
+                      draggable
+                      onDragStart={(e) => handleDragStart(st._lid, e)}
+                      onDragOver={(e) => handleDragOver(e, st._lid)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleDrop(st._lid);
+                      }}
+                      onDragEnd={handleDragEnd}
+                      className={[
+                        "flex items-center gap-2 px-3 py-2 border rounded-lg group select-none transition-all duration-150",
+                        isDragging
+                          ? "opacity-40 scale-[0.97] bg-white/2 border-white/5 cursor-grabbing"
+                          : "bg-white/4 border-white/7 cursor-default",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <div
+                        className="text-white/15 hover:text-white/40 transition-colors cursor-grab active:cursor-grabbing shrink-0 -ml-0.5"
+                        title="Drag to reorder"
+                        aria-hidden="true"
+                      >
+                        <GripVertical size={13} />
+                      </div>
+                      <span className="flex-1 text-sm text-white/70 truncate">
+                        {st.title}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeSubTask(st._lid)}
+                        className="p-0.5 rounded text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                        aria-label={`Remove "${st.title}"`}
+                        title="Remove sub-task"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                    {showAfter && (
+                      <div className="absolute -bottom-0.5 left-3 right-3 h-0.5 bg-violet-500/65 rounded-full z-10 animate-fade-in" />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
           <div className="flex gap-2">

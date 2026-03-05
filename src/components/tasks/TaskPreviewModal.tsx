@@ -70,11 +70,16 @@ export function TaskPreviewModal({
 
   const [subTasks, setSubTasks] = useState<SubTask[]>([]);
   const [subTasksLoading, setSubTasksLoading] = useState(false);
+  const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
+  const completingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   useEffect(() => {
     if (task) {
       setSubTasksLoading(true);
       setSubTasks([]);
+      setCompletingIds(new Set());
       fetchSubTasks(task.id).then((data) => {
         setSubTasks(data);
         setSubTasksLoading(false);
@@ -85,14 +90,44 @@ export function TaskPreviewModal({
     }
   }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Cleanup timers on unmount
+  useEffect(() => {
+    const timers = completingTimers.current;
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+    };
+  }, []);
+
   const handleToggleSub = async (st: SubTask) => {
-    const ok = await onToggleSubTask(st.id, !st.completed);
+    const willComplete = !st.completed;
+    if (willComplete) {
+      setCompletingIds((prev) => new Set(prev).add(st.id));
+      const existing = completingTimers.current.get(st.id);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(() => {
+        setCompletingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(st.id);
+          return next;
+        });
+        completingTimers.current.delete(st.id);
+      }, 700);
+      completingTimers.current.set(st.id, timer);
+    }
+    const ok = await onToggleSubTask(st.id, willComplete);
     if (ok) {
       setSubTasks((prev) =>
         prev.map((s) =>
-          s.id === st.id ? { ...s, completed: !s.completed } : s,
+          s.id === st.id ? { ...s, completed: willComplete } : s,
         ),
       );
+    } else if (willComplete) {
+      // Revert animation if API failed
+      setCompletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(st.id);
+        return next;
+      });
     }
   };
 
@@ -194,33 +229,71 @@ export function TaskPreviewModal({
                   ))}
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {subTasks.map((st) => (
-                    <button
-                      key={st.id}
-                      type="button"
-                      onClick={() => handleToggleSub(st)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/4 transition-colors text-left"
-                    >
-                      {st.completed ? (
-                        <CheckCircle2
-                          size={15}
-                          className="text-emerald-400/60 shrink-0"
-                        />
-                      ) : (
-                        <Circle size={15} className="text-white/20 shrink-0" />
-                      )}
-                      <span
-                        className={`text-sm ${
+                <div className="space-y-0.5">
+                  {subTasks.map((st) => {
+                    const isCompleting = completingIds.has(st.id);
+                    return (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => handleToggleSub(st)}
+                        role="checkbox"
+                        aria-checked={st.completed}
+                        aria-label={
                           st.completed
-                            ? "line-through text-white/30"
-                            : "text-white/70"
-                        }`}
+                            ? `Mark "${st.title}" as incomplete`
+                            : `Mark "${st.title}" as complete`
+                        }
+                        className={[
+                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 group/sub relative",
+                          isCompleting ? "animate-row-complete" : "",
+                          st.completed
+                            ? "hover:bg-white/2.5"
+                            : "hover:bg-emerald-500/5",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
-                        {st.title}
-                      </span>
-                    </button>
-                  ))}
+                        <span
+                          className={[
+                            "shrink-0 transition-all duration-150",
+                            isCompleting ? "animate-check-pop" : "",
+                            st.completed
+                              ? "text-emerald-400/60"
+                              : "text-white/20 group-hover/sub:text-emerald-400/55",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {st.completed ? (
+                            <CheckCircle2 size={15} />
+                          ) : (
+                            <Circle size={15} />
+                          )}
+                        </span>
+                        <span
+                          className={`text-sm flex-1 transition-colors duration-200 ${
+                            st.completed
+                              ? "line-through text-white/30"
+                              : "text-white/70 group-hover/sub:text-white/85"
+                          }`}
+                        >
+                          {st.title}
+                        </span>
+                        {/* Inline hover action hint */}
+                        <span
+                          className={`text-[10px] font-medium shrink-0 ml-1 opacity-0 group-hover/sub:opacity-100 transition-all duration-150 ${
+                            st.completed
+                              ? "text-white/25"
+                              : "text-emerald-400/60"
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {st.completed ? "Undo" : "Complete"}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
