@@ -288,8 +288,7 @@ function SecurityTab() {
     if (!profile?.encryption_salt || !encryptionKey) {
       setLoading(false);
       setErrors({
-        current:
-          "Vault not initialised. Sign out and sign back in, then retry.",
+        new: "Vault not initialised. Sign out and sign back in, then retry.",
       });
       return;
     }
@@ -303,7 +302,7 @@ function SecurityTab() {
 
     if (tasksErr) {
       setLoading(false);
-      setErrors({ current: "Failed to read tasks: " + tasksErr.message });
+      setErrors({ new: "Failed to read tasks: " + tasksErr.message });
       return;
     }
 
@@ -336,8 +335,7 @@ function SecurityTab() {
           await setEncryptionKey(newKey);
           setLoading(false);
           setErrors({
-            current:
-              "Re-encryption failed partway. Please sign out and sign back in.",
+            new: "Re-encryption failed partway. Please sign out and sign back in.",
           });
           return;
         }
@@ -368,8 +366,7 @@ function SecurityTab() {
           await setEncryptionKey(newKey);
           setLoading(false);
           setErrors({
-            current:
-              "Re-encryption failed partway. Please sign out and sign back in.",
+            new: "Re-encryption failed partway. Please sign out and sign back in.",
           });
           return;
         }
@@ -406,8 +403,7 @@ function SecurityTab() {
           await setEncryptionKey(newKey);
           setLoading(false);
           setErrors({
-            current:
-              "Re-encryption failed partway. Please sign out and sign back in.",
+            new: "Re-encryption failed partway. Please sign out and sign back in.",
           });
           return;
         }
@@ -430,8 +426,7 @@ function SecurityTab() {
       await setEncryptionKey(newKey);
       setLoading(false);
       setErrors({
-        current:
-          "Vault re-encrypted but password update failed: " + pwdErr.message,
+        new: "Vault re-encrypted but password update failed: " + pwdErr.message,
       });
       return;
     }
