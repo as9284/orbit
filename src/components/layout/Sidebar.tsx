@@ -41,7 +41,7 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav
-          className="flex flex-col items-center gap-1 px-2.5 py-4 flex-1 w-full overflow-hidden"
+          className="flex flex-col items-center gap-1 px-2.5 py-4 flex-1 w-full"
           role="navigation"
           aria-label="Main"
         >
