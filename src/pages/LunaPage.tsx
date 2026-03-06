@@ -12,6 +12,7 @@ import {
   BrainCircuit,
   Trash2,
   Square,
+  LoaderCircle,
   User as UserIcon,
   CheckCircle2,
   StickyNote,
@@ -45,7 +46,7 @@ interface UIMessage {
 
 interface ToolResult {
   tool: string;
-  success: boolean;
+  status: "pending" | "success" | "error";
   label: string;
 }
 
@@ -82,6 +83,8 @@ export function LunaPage() {
   const [streaming, setStreaming] = useState(false);
   const [thinkingMode, setThinkingMode] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const activeAssistantMessageIdRef = useRef<string | null>(null);
+  const activeAssistantHasOutputRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -119,6 +122,85 @@ export function LunaPage() {
     });
   }, []);
 
+  const ensureActiveAssistantMessage = useCallback(() => {
+    if (activeAssistantMessageIdRef.current) {
+      return activeAssistantMessageIdRef.current;
+    }
+
+    const id = nextId();
+    activeAssistantMessageIdRef.current = id;
+    activeAssistantHasOutputRef.current = false;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id,
+        role: "assistant",
+        content: "",
+        pending: true,
+      },
+    ]);
+    return id;
+  }, []);
+
+  const closeActiveAssistantMessage = useCallback(() => {
+    const activeId = activeAssistantMessageIdRef.current;
+    if (!activeId) return;
+
+    if (activeAssistantHasOutputRef.current) {
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === activeId ? { ...message, pending: false } : message,
+        ),
+      );
+    } else {
+      setMessages((prev) => prev.filter((message) => message.id !== activeId));
+    }
+
+    activeAssistantMessageIdRef.current = null;
+    activeAssistantHasOutputRef.current = false;
+  }, []);
+
+  const createToolStatusMessage = useCallback(
+    (tool: string, label: string) => {
+      const id = nextId();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id,
+          role: "assistant",
+          content: "",
+          toolResults: [
+            {
+              tool,
+              status: "pending",
+              label,
+            },
+          ],
+        },
+      ]);
+      scrollToBottom();
+      return id;
+    },
+    [scrollToBottom],
+  );
+
+  const updateToolStatusMessage = useCallback(
+    (messageId: string, result: ToolResult) => {
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                toolResults: [result],
+              }
+            : message,
+        ),
+      );
+      scrollToBottom();
+    },
+    [scrollToBottom],
+  );
+
   const handleSend = useCallback(
     async (e?: FormEvent) => {
       e?.preventDefault();
@@ -146,8 +228,10 @@ export function LunaPage() {
         role: "assistant",
         content: "",
         pending: true,
-        toolResults: [],
       };
+
+      activeAssistantMessageIdRef.current = assistantMsg.id;
+      activeAssistantHasOutputRef.current = false;
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setInput("");
@@ -168,17 +252,17 @@ export function LunaPage() {
           }),
         },
         // Include previous conversation (excluding pending/tool metadata)
-        ...messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
+        ...messages
+          .filter((m) => m.content.trim())
+          .map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          })),
         { role: "user" as const, content: text },
       ];
 
       const controller = new AbortController();
       abortRef.current = controller;
-
-      const toolResults: ToolResult[] = [];
 
       const shouldThink = thinkingMode && activeModelSupportsThinking();
 
@@ -187,19 +271,21 @@ export function LunaPage() {
         "",
         {
           onToken: (token) => {
+            const activeId = ensureActiveAssistantMessage();
+            activeAssistantHasOutputRef.current = true;
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantMsg.id
-                  ? { ...m, content: m.content + token }
-                  : m,
+                m.id === activeId ? { ...m, content: m.content + token } : m,
               ),
             );
             scrollToBottom();
           },
           onReasoningToken: (token) => {
+            const activeId = ensureActiveAssistantMessage();
+            activeAssistantHasOutputRef.current = true;
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantMsg.id
+                m.id === activeId
                   ? { ...m, reasoning: (m.reasoning ?? "") + token }
                   : m,
               ),
@@ -214,6 +300,8 @@ export function LunaPage() {
             );
           },
           onToolCall: async (name, args) => {
+            closeActiveAssistantMessage();
+
             if (name === "create_task") {
               const title = String(args.title ?? "Untitled task");
               const description = args.description
@@ -230,6 +318,10 @@ export function LunaPage() {
                     title: String(s),
                   }))
                 : [];
+              const statusId = createToolStatusMessage(
+                "create_task",
+                `Creating task: ${title}`,
+              );
 
               const taskId = await tasksApi.createTask({
                 title,
@@ -241,9 +333,9 @@ export function LunaPage() {
                 await tasksApi.saveSubTasks(taskId, subTasks, []);
               }
               const ok = !!taskId;
-              toolResults.push({
+              updateToolStatusMessage(statusId, {
                 tool: "create_task",
-                success: ok,
+                status: ok ? "success" : "error",
                 label: ok ? `Created task: ${title}` : "Failed to create task",
               });
               if (ok) toast.success(`Task created: ${title}`);
@@ -256,14 +348,18 @@ export function LunaPage() {
             if (name === "create_note") {
               const title = String(args.title ?? "Untitled note");
               const content = args.content ? String(args.content) : undefined;
+              const statusId = createToolStatusMessage(
+                "create_note",
+                `Making note: ${title}`,
+              );
               const noteId = await notesApi.createNote({
                 title,
                 content,
               });
               const ok = !!noteId;
-              toolResults.push({
+              updateToolStatusMessage(statusId, {
                 tool: "create_note",
-                success: ok,
+                status: ok ? "success" : "error",
                 label: ok ? `Created note: ${title}` : "Failed to create note",
               });
               if (ok) toast.success(`Note created: ${title}`);
@@ -276,36 +372,53 @@ export function LunaPage() {
             return "Unknown tool";
           },
           onDone: (fullText, reasoning) => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantMsg.id
-                  ? {
-                      ...m,
-                      content: fullText || m.content,
-                      reasoning: reasoning ?? m.reasoning,
-                      pending: false,
-                      toolResults:
-                        toolResults.length > 0 ? [...toolResults] : undefined,
-                    }
-                  : m,
-              ),
-            );
+            const activeId = activeAssistantMessageIdRef.current;
+            if (activeId) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === activeId
+                    ? {
+                        ...m,
+                        content: fullText || m.content,
+                        reasoning: reasoning ?? m.reasoning,
+                        pending: false,
+                      }
+                    : m,
+                ),
+              );
+            }
+            activeAssistantMessageIdRef.current = null;
+            activeAssistantHasOutputRef.current = false;
             setStreaming(false);
             abortRef.current = null;
             scrollToBottom();
           },
           onError: (error) => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantMsg.id
-                  ? {
-                      ...m,
-                      content: m.content || error,
-                      pending: false,
-                    }
-                  : m,
-              ),
-            );
+            const activeId = activeAssistantMessageIdRef.current;
+            if (activeId) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === activeId
+                    ? {
+                        ...m,
+                        content: m.content || error,
+                        pending: false,
+                      }
+                    : m,
+                ),
+              );
+            } else {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: nextId(),
+                  role: "assistant",
+                  content: error,
+                },
+              ]);
+            }
+            activeAssistantMessageIdRef.current = null;
+            activeAssistantHasOutputRef.current = false;
             setStreaming(false);
             abortRef.current = null;
           },
@@ -328,6 +441,8 @@ export function LunaPage() {
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    activeAssistantMessageIdRef.current = null;
+    activeAssistantHasOutputRef.current = false;
     setStreaming(false);
     setMessages((prev) =>
       prev.map((m) => (m.pending ? { ...m, pending: false } : m)),
@@ -472,6 +587,9 @@ export function LunaPage() {
 function MessageBubble({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  const hasToolResults = !!message.toolResults?.length;
+  const showTextBubble =
+    isUser || !!message.content || (!hasToolResults && message.pending);
 
   return (
     <div
@@ -508,33 +626,37 @@ function MessageBubble({ message }: { message: UIMessage }) {
           </div>
         )}
 
-        <div
-          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-            isUser
-              ? "bg-violet-500/20 border border-violet-500/15 text-white/90 rounded-br-md"
-              : "bg-white/4 border border-white/7 text-white/80 rounded-bl-md"
-          }`}
-        >
-          {isUser ? (
-            <p className="whitespace-pre-wrap wrap-break-word">
-              {message.content}
-            </p>
-          ) : message.content ? (
-            <div className="prose-luna">{renderMarkdown(message.content)}</div>
-          ) : message.pending ? (
-            <div className="flex items-center gap-1.5 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce" />
-              <span
-                className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce"
-                style={{ animationDelay: "150ms" }}
-              />
-              <span
-                className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce"
-                style={{ animationDelay: "300ms" }}
-              />
-            </div>
-          ) : null}
-        </div>
+        {showTextBubble && (
+          <div
+            className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+              isUser
+                ? "bg-violet-500/20 border border-violet-500/15 text-white/90 rounded-br-md"
+                : "bg-white/4 border border-white/7 text-white/80 rounded-bl-md"
+            }`}
+          >
+            {isUser ? (
+              <p className="whitespace-pre-wrap wrap-break-word">
+                {message.content}
+              </p>
+            ) : message.content ? (
+              <div className="prose-luna">
+                {renderMarkdown(message.content)}
+              </div>
+            ) : message.pending ? (
+              <div className="flex items-center gap-1.5 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce" />
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                />
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                />
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {/* Tool call results */}
         {message.toolResults && message.toolResults.length > 0 && (
@@ -543,12 +665,16 @@ function MessageBubble({ message }: { message: UIMessage }) {
               <div
                 key={i}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium ${
-                  tr.success
+                  tr.status === "success"
                     ? "bg-emerald-500/8 border-emerald-500/15 text-emerald-400/90"
-                    : "bg-red-500/8 border-red-500/15 text-red-400/90"
+                    : tr.status === "error"
+                      ? "bg-red-500/8 border-red-500/15 text-red-400/90"
+                      : "bg-white/4 border-white/10 text-white/65"
                 }`}
               >
-                {tr.tool === "create_task" ? (
+                {tr.status === "pending" ? (
+                  <LoaderCircle size={12} className="animate-spin" />
+                ) : tr.tool === "create_task" ? (
                   <CheckCircle2 size={12} />
                 ) : (
                   <StickyNote size={12} />

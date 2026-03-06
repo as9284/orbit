@@ -1,5 +1,14 @@
 import { useRef, useCallback, useEffect } from "react";
-import { Bold, Italic, Strikethrough, List, ListOrdered } from "lucide-react";
+import {
+  Bold,
+  Heading1,
+  Heading2,
+  Heading3,
+  Italic,
+  Strikethrough,
+  List,
+  ListOrdered,
+} from "lucide-react";
 
 interface Props {
   value: string;
@@ -9,9 +18,20 @@ interface Props {
   hasError?: boolean;
 }
 
-type Format = "bold" | "italic" | "strikethrough" | "ul" | "ol";
+type Format =
+  | "h1"
+  | "h2"
+  | "h3"
+  | "bold"
+  | "italic"
+  | "strikethrough"
+  | "ul"
+  | "ol";
 
 const TOOLBAR: { fmt: Format; icon: typeof Bold; label: string }[] = [
+  { fmt: "h1", icon: Heading1, label: "Heading 1" },
+  { fmt: "h2", icon: Heading2, label: "Heading 2" },
+  { fmt: "h3", icon: Heading3, label: "Heading 3" },
   { fmt: "bold", icon: Bold, label: "Bold" },
   { fmt: "italic", icon: Italic, label: "Italic" },
   { fmt: "strikethrough", icon: Strikethrough, label: "Strikethrough" },
@@ -43,11 +63,27 @@ function markdownToHtml(md: string): string {
   let inUl = false;
   let inOl = false;
 
+  const closeLists = () => {
+    if (inUl) {
+      parts.push("</ul>");
+      inUl = false;
+    }
+    if (inOl) {
+      parts.push("</ol>");
+      inOl = false;
+    }
+  };
+
   for (const line of lines) {
+    const headingMatch = line.match(/^(#{1,3})\s+(.*)/);
     const ulMatch = line.match(/^[-*]\s+(.*)/);
     const olMatch = line.match(/^\d+\.\s+(.*)/);
 
-    if (ulMatch) {
+    if (headingMatch) {
+      closeLists();
+      const level = headingMatch[1].length;
+      parts.push(`<h${level}>${inlineMdToHtml(headingMatch[2])}</h${level}>`);
+    } else if (ulMatch) {
       if (inOl) {
         parts.push("</ol>");
         inOl = false;
@@ -68,20 +104,12 @@ function markdownToHtml(md: string): string {
       }
       parts.push(`<li>${inlineMdToHtml(olMatch[1])}</li>`);
     } else {
-      if (inUl) {
-        parts.push("</ul>");
-        inUl = false;
-      }
-      if (inOl) {
-        parts.push("</ol>");
-        inOl = false;
-      }
+      closeLists();
       parts.push(`<div>${inlineMdToHtml(line)}</div>`);
     }
   }
 
-  if (inUl) parts.push("</ul>");
-  if (inOl) parts.push("</ol>");
+  closeLists();
   return parts.join("");
 }
 
@@ -106,6 +134,15 @@ function walkNodes(node: Node): string {
     const tag = el.tagName.toLowerCase();
 
     switch (tag) {
+      case "h1":
+      case "h2":
+      case "h3": {
+        if (out && !out.endsWith("\n")) out += "\n";
+        const level = Number(tag[1]);
+        out += `${"#".repeat(level)} ${walkNodes(el)}`;
+        if (!out.endsWith("\n")) out += "\n";
+        break;
+      }
       case "strong":
       case "b":
         out += `**${walkNodes(el)}**`;
@@ -203,6 +240,15 @@ export function RichTextEditor({
     (fmt: Format) => {
       editorRef.current?.focus();
       switch (fmt) {
+        case "h1":
+          document.execCommand("formatBlock", false, "<h1>");
+          break;
+        case "h2":
+          document.execCommand("formatBlock", false, "<h2>");
+          break;
+        case "h3":
+          document.execCommand("formatBlock", false, "<h3>");
+          break;
         case "bold":
           document.execCommand("bold");
           break;
@@ -267,7 +313,7 @@ export function RichTextEditor({
           role="textbox"
           aria-multiline="true"
           aria-placeholder={placeholder}
-          className="w-full bg-transparent px-3.5 py-3 text-white/85 text-sm outline-none min-h-35 leading-relaxed [&_strong]:font-semibold [&_strong]:text-white [&_b]:font-semibold [&_b]:text-white [&_s]:text-white/40 [&_strike]:text-white/40 [&_ul]:list-disc [&_ul]:list-inside [&_ul]:space-y-0.5 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:space-y-0.5"
+          className="w-full bg-transparent px-3.5 py-3 text-white/85 text-sm outline-none min-h-35 leading-relaxed [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:text-white [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-white/95 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white/90 [&_strong]:font-semibold [&_strong]:text-white [&_b]:font-semibold [&_b]:text-white [&_s]:text-white/40 [&_strike]:text-white/40 [&_ul]:list-disc [&_ul]:list-inside [&_ul]:space-y-0.5 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:space-y-0.5"
         />
         {isEmpty && (
           <div

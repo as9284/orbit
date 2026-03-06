@@ -1,7 +1,7 @@
 /**
  * Renders a markdown-like string into an array of React elements.
- * Supports: **bold**, *italic*, ~~strikethrough~~, bullet lists (- ),
- * numbered lists (1. ), and line breaks.
+ * Supports: # headings, **bold**, *italic*, ~~strikethrough~~,
+ * bullet lists (- ), numbered lists (1. ), and line breaks.
  */
 export function renderMarkdown(text: string): React.ReactNode[] {
   const lines = text.split("\n");
@@ -29,10 +29,40 @@ export function renderMarkdown(text: string): React.ReactNode[] {
   }
 
   for (const line of lines) {
+    const headingMatch = line.match(/^(#{1,3})\s+(.*)/);
     const ulMatch = line.match(/^[-*]\s+(.*)/);
     const olMatch = line.match(/^\d+\.\s+(.*)/);
 
-    if (ulMatch) {
+    if (headingMatch) {
+      flushList();
+      const level = headingMatch[1].length;
+      const content = inlineFormat(headingMatch[2]);
+      if (level === 1) {
+        result.push(
+          <h1
+            key={key++}
+            className="mt-1 text-xl font-semibold tracking-tight text-white"
+          >
+            {content}
+          </h1>,
+        );
+      } else if (level === 2) {
+        result.push(
+          <h2 key={key++} className="mt-1 text-lg font-semibold text-white/95">
+            {content}
+          </h2>,
+        );
+      } else {
+        result.push(
+          <h3
+            key={key++}
+            className="mt-1 text-base font-semibold text-white/90"
+          >
+            {content}
+          </h3>,
+        );
+      }
+    } else if (ulMatch) {
       if (listType !== "ul") {
         flushList();
         listType = "ul";
@@ -106,6 +136,7 @@ function inlineFormat(text: string): React.ReactNode {
  */
 export function stripMarkdown(text: string): string {
   return text
+    .replace(/^#{1,6}\s+/gm, "") // headings
     .replace(/\*\*(.+?)\*\*/g, "$1") // **bold**
     .replace(/\*(.+?)\*/g, "$1") // *italic*
     .replace(/~~(.+?)~~/g, "$1") // ~~strikethrough~~
