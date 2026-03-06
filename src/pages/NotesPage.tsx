@@ -17,7 +17,8 @@ import { CreateNoteModal } from "../components/notes/CreateNoteModal";
 import { EditNoteModal } from "../components/notes/EditNoteModal";
 import { NotePreviewModal } from "../components/notes/NotePreviewModal";
 import { stripMarkdown } from "../lib/markdown";
-import { convertNoteToTaskDraft, getOpenRouterKey } from "../lib/openrouter";
+import { isFeatureReady } from "../lib/ai";
+import { convertNoteToTaskDraft } from "../lib/openrouter";
 import type { Note } from "../types/database.types";
 
 export function NotesPage() {
@@ -31,6 +32,14 @@ export function NotesPage() {
   const [search, setSearch] = useState("");
   const [convertingNoteId, setConvertingNoteId] = useState<string | null>(null);
   const [postConvertNote, setPostConvertNote] = useState<Note | null>(null);
+
+  // Re-render when AI settings change so feature checks update immediately
+  const [, setAiTick] = useState(0);
+  useEffect(() => {
+    const handler = () => setAiTick((t) => t + 1);
+    window.addEventListener("orbit:ai:changed", handler);
+    return () => window.removeEventListener("orbit:ai:changed", handler);
+  }, []);
 
   useEffect(() => {
     if (encryptionKey) api.fetchNotes();
@@ -99,22 +108,17 @@ export function NotesPage() {
 
   const handleConvertToTask = useCallback(
     async (note: Note) => {
-      const apiKey = getOpenRouterKey();
-      if (!apiKey) {
-        toast.error("Add your OpenRouter API key in Settings > AI first");
+      if (!isFeatureReady("noteToTask")) {
+        toast.error("Enable Note → Task in Settings → Luna first");
         return;
       }
 
       setConvertingNoteId(note.id);
       try {
-        const result = await convertNoteToTaskDraft(
-          note.title,
-          note.content,
-          apiKey,
-        );
+        const result = await convertNoteToTaskDraft(note.title, note.content);
 
         if (!result.draft) {
-          toast.error(result.error || "Failed to convert note with AI");
+          toast.error(result.error || "Luna couldn't convert this note");
           return;
         }
 
@@ -125,7 +129,7 @@ export function NotesPage() {
         });
 
         if (!taskId) {
-          toast.error("Task creation failed after AI conversion");
+          toast.error("Task creation failed after Luna conversion");
           return;
         }
 
@@ -155,10 +159,10 @@ export function NotesPage() {
 
         toast.success(
           categoryResult.category
-            ? `Task created with AI in ${categoryResult.category}`
+            ? `Task created with Luna in ${categoryResult.category}`
             : result.model
-              ? `Task created with AI via ${result.model}`
-              : "Task created with AI",
+              ? `Task created with Luna via ${result.model}`
+              : "Task created with Luna",
         );
         setPostConvertNote(note);
       } finally {
@@ -356,7 +360,7 @@ function NoteCard({
             }}
             disabled={converting}
             className="p-1.5 rounded-lg text-cyan-300/45 hover:text-cyan-200 hover:bg-cyan-500/10 transition-all disabled:opacity-60 disabled:cursor-wait"
-            aria-label="Convert note to task with AI"
+            aria-label="Convert note to task with Luna"
           >
             {converting ? <Spinner size={12} /> : <Sparkles size={12} />}
           </button>

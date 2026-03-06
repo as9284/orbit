@@ -1,5 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { ListTodo, Archive, LogOut, Settings, StickyNote } from "lucide-react";
+import {
+  ListTodo,
+  Archive,
+  Settings,
+  StickyNote,
+  BrainCircuit,
+} from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { SettingsModal } from "../settings/SettingsModal";
@@ -7,11 +13,12 @@ import { SettingsModal } from "../settings/SettingsModal";
 const NAV = [
   { icon: ListTodo, label: "Tasks", to: "/" },
   { icon: StickyNote, label: "Notes", to: "/notes" },
+  { icon: BrainCircuit, label: "Luna", to: "/luna" },
   { icon: Archive, label: "Archive", to: "/archive" },
 ];
 
 export function Sidebar() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsKey, setSettingsKey] = useState(0);
 
@@ -30,10 +37,10 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="w-[68px] shrink-0 hidden md:flex flex-col items-center bg-orbit-900/95 border-r border-white/[0.06] sticky top-0 h-screen z-20 backdrop-blur-sm">
+      <aside className="w-17 shrink-0 hidden md:flex flex-col items-center bg-orbit-900/95 border-r border-white/6 sticky top-0 h-screen z-20 backdrop-blur-sm">
         {/* Logo mark */}
-        <div className="py-[18px] flex items-center justify-center w-full border-b border-white/[0.05] shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/[0.09] flex items-center justify-center relative select-none">
+        <div className="py-4.5 flex items-center justify-center w-full border-b border-white/5 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/9 flex items-center justify-center relative select-none">
             <div className="absolute inset-0 rounded-xl bg-violet-500/8 blur-lg" />
             <OrbitMark />
           </div>
@@ -53,8 +60,8 @@ export function Sidebar() {
               className={({ isActive }) =>
                 `group relative flex items-center justify-center w-full aspect-square rounded-xl transition-all duration-200 focus-ring ${
                   isActive
-                    ? "bg-violet-500/[0.13] text-violet-400 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.13)]"
-                    : "text-white/25 hover:text-white/75 hover:bg-white/[0.06]"
+                    ? "bg-violet-500/13 text-violet-400 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.13)]"
+                    : "text-white/25 hover:text-white/75 hover:bg-white/6"
                 }`
               }
             >
@@ -67,7 +74,7 @@ export function Sidebar() {
                     )}
                   </div>
                   {/* Tooltip */}
-                  <span className="pointer-events-none absolute left-[calc(100%+10px)] px-2.5 py-1.5 rounded-lg bg-orbit-800 border border-white/[0.1] text-xs font-medium text-white/85 whitespace-nowrap shadow-xl shadow-black/50 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150 z-50">
+                  <span className="pointer-events-none absolute left-[calc(100%+10px)] px-2.5 py-1.5 rounded-lg bg-orbit-800 border border-white/10 text-xs font-medium text-white/85 whitespace-nowrap shadow-xl shadow-black/50 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150 z-50">
                     {label}
                     {/* Tooltip arrow */}
                     <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-orbit-800" />
@@ -79,31 +86,18 @@ export function Sidebar() {
         </nav>
 
         {/* User controls */}
-        <div className="flex flex-col items-center gap-1 px-2.5 pb-4 pt-3 border-t border-white/[0.05] w-full shrink-0">
+        <div className="flex flex-col items-center gap-1 px-2.5 pb-4 pt-3 border-t border-white/5 w-full shrink-0">
           {/* Avatar → Settings */}
           <button
             onClick={openSettings}
             aria-label="Settings"
-            className="group relative flex items-center justify-center w-full aspect-square rounded-xl text-white/40 hover:bg-white/[0.06] transition-all duration-200 focus-ring"
+            className="group relative flex items-center justify-center w-full aspect-square rounded-xl text-white/40 hover:bg-white/6 transition-all duration-200 focus-ring"
           >
-            <div className="w-7 h-7 rounded-full bg-linear-to-br from-violet-500/50 to-blue-500/50 border border-white/[0.15] flex items-center justify-center text-[10px] font-bold text-white/80 select-none shadow-sm shadow-violet-500/20">
+            <div className="w-7 h-7 rounded-full bg-linear-to-br from-violet-500/50 to-blue-500/50 border border-white/15 flex items-center justify-center text-[10px] font-bold text-white/80 select-none shadow-sm shadow-violet-500/20">
               {initials}
             </div>
-            <span className="pointer-events-none absolute left-[calc(100%+10px)] px-2.5 py-1.5 rounded-lg bg-orbit-800 border border-white/[0.1] text-xs font-medium text-white/85 whitespace-nowrap shadow-xl shadow-black/50 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150 z-50">
+            <span className="pointer-events-none absolute left-[calc(100%+10px)] px-2.5 py-1.5 rounded-lg bg-orbit-800 border border-white/10 text-xs font-medium text-white/85 whitespace-nowrap shadow-xl shadow-black/50 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150 z-50">
               Settings
-              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-orbit-800" />
-            </span>
-          </button>
-
-          {/* Sign out */}
-          <button
-            onClick={signOut}
-            aria-label="Sign out"
-            className="group relative flex items-center justify-center w-full aspect-square rounded-xl text-white/20 hover:text-red-400/60 hover:bg-red-500/[0.06] transition-all duration-200 focus-ring"
-          >
-            <LogOut size={15} strokeWidth={1.8} />
-            <span className="pointer-events-none absolute left-[calc(100%+10px)] px-2.5 py-1.5 rounded-lg bg-orbit-800 border border-white/[0.1] text-xs font-medium text-white/85 whitespace-nowrap shadow-xl shadow-black/50 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150 z-50">
-              Sign out
               <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-orbit-800" />
             </span>
           </button>
@@ -119,7 +113,6 @@ export function Sidebar() {
 }
 
 export function MobileNav() {
-  const { signOut } = useAuth();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsKey, setSettingsKey] = useState(0);
 
@@ -167,14 +160,6 @@ export function MobileNav() {
         >
           <Settings size={18} />
           <span>Settings</span>
-        </button>
-        <button
-          onClick={signOut}
-          aria-label="Sign out"
-          className="flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-semibold tracking-wider uppercase text-white/30 active:text-white/60 transition-colors focus-ring rounded-xl"
-        >
-          <LogOut size={18} />
-          <span>Sign out</span>
         </button>
       </nav>
       <SettingsModal

@@ -1,47 +1,30 @@
-export const OPENROUTER_KEY_STORAGE = "orbit:openrouter:apikey";
+import {
+  getActiveApiKey,
+  getAiSettings,
+  PROVIDERS,
+  type ProviderId,
+} from "./ai";
 
-/**
- * Prefer the free router so OpenRouter can select an available free provider,
- * then fall back to known free models if the router is temporarily unavailable.
- */
-export const AI_MODEL = "openrouter/free";
-export const AI_FALLBACK_MODELS = [
-  AI_MODEL,
-  "qwen/qwen3-next-80b-a3b-instruct:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "google/gemma-3-4b-it:free",
-] as const;
+// ── Re-exports for backward compat ──────────────────────────────────────────
+
+/** @deprecated Use getActiveApiKey() from ai.ts */
+export function getOpenRouterKey(): string {
+  return getActiveApiKey();
+}
+
+/** @deprecated No longer needed — use Settings UI */
+export function setOpenRouterKey(_key: string): void {
+  // no-op; keys are managed via ai.ts saveAiSettings now
+}
+
+export const AI_MODEL = "deepseek-chat"; // informational only
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 export interface CategorizeTaskResult {
   category: string | null;
   model: string | null;
   error: string | null;
-}
-
-function normalizeCategoryLabel(value: string): string {
-  return value
-    .trim()
-    .replace(/^["']|["']$/g, "")
-    .replace(/[.!?,:;]+$/g, "")
-    .replace(/\s+/g, " ");
-}
-
-function matchExistingCategory(
-  candidate: string,
-  existingCategories: readonly string[],
-): string | null {
-  const normalizedCandidate = normalizeCategoryLabel(candidate).toLowerCase();
-  if (!normalizedCandidate) return null;
-
-  for (const existing of existingCategories) {
-    if (
-      normalizeCategoryLabel(existing).toLowerCase() === normalizedCandidate
-    ) {
-      return existing;
-    }
-  }
-
-  return null;
 }
 
 export interface AiTaskDraft {
@@ -57,40 +40,84 @@ export interface ConvertNoteToTaskResult {
   error: string | null;
 }
 
-export function getOpenRouterKey(): string {
-  return localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? "";
+export interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
 }
 
-export function setOpenRouterKey(key: string): void {
-  const trimmed = key.trim();
-  if (trimmed) {
-    localStorage.setItem(OPENROUTER_KEY_STORAGE, trimmed);
-  } else {
-    localStorage.removeItem(OPENROUTER_KEY_STORAGE);
-  }
+export interface CacheInfo {
+  cacheHitTokens: number;
+  cacheMissTokens: number;
 }
 
-async function requestOpenRouterText(
-  prompt: string,
+export interface StreamCallbacks {
+  onToken: (token: string) => void;
+  onReasoningToken?: (token: string) => void;
+  onToolCall: (name: string, args: Record<string, unknown>) => void;
+  onDone: (fullText: string, reasoning?: string) => void;
+  onError: (error: string) => void;
+  onCacheInfo?: (info: CacheInfo) => void;
+}
+
+// ── Internal helpers ─────────────────────────────────────────────────────────
+
+function getRequestHeaders(
   apiKey: string,
+  provider: ProviderId,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+  };
+  if (provider === "openrouter") {
+    headers["HTTP-Referer"] = window.location.origin;
+    headers["X-Title"] = "Orbit";
+  }
+  return headers;
+}
+
+function getOpenRouterFallbackModels(): string[] {
+  const settings = getAiSettings();
+  const primary = settings.model.openrouter;
+  const allFree = PROVIDERS.openrouter.models
+    .filter((m) => m.free)
+    .map((m) => m.id);
+  // put selected model first, then remaining free models as fallbacks
+  return [primary, ...allFree.filter((id) => id !== primary)];
+}
+
+async function requestAiText(
+  prompt: string,
   maxTokens = 300,
 ): Promise<{
   text: string | null;
   model: string | null;
   error: string | null;
 }> {
+  const settings = getAiSettings();
+  const apiKey = settings.keys[settings.provider]?.trim();
+  if (!apiKey)
+    return {
+      text: null,
+      model: null,
+      error: "No API key configured. Go to Settings → Luna.",
+    };
+
+  const baseUrl = PROVIDERS[settings.provider].baseUrl;
+  const headers = getRequestHeaders(apiKey, settings.provider);
+
+  const models =
+    settings.provider === "openrouter"
+      ? getOpenRouterFallbackModels()
+      : [settings.model.deepseek];
+
   let lastError: string | null = null;
 
-  for (const model of AI_FALLBACK_MODELS) {
+  for (const model of models) {
     try {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "Orbit",
-        },
+        headers,
         body: JSON.stringify({
           model,
           messages: [{ role: "user", content: prompt }],
@@ -110,9 +137,7 @@ async function requestOpenRouterText(
         choices?: { message?: { content?: string } }[];
       };
       const text = data.choices?.[0]?.message?.content?.trim() ?? "";
-      if (text) {
-        return { text, model: data.model ?? model, error: null };
-      }
+      if (text) return { text, model: data.model ?? model, error: null };
 
       lastError = `${model} returned an empty response.`;
     } catch (error) {
@@ -121,6 +146,29 @@ async function requestOpenRouterText(
   }
 
   return { text: null, model: null, error: lastError };
+}
+
+// ── Text helpers ─────────────────────────────────────────────────────────────
+
+function normalizeCategoryLabel(value: string): string {
+  return value
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/[.!?,:;]+$/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function matchExistingCategory(
+  candidate: string,
+  existingCategories: readonly string[],
+): string | null {
+  const norm = normalizeCategoryLabel(candidate).toLowerCase();
+  if (!norm) return null;
+  for (const existing of existingCategories) {
+    if (normalizeCategoryLabel(existing).toLowerCase() === norm)
+      return existing;
+  }
+  return null;
 }
 
 function stripMarkdownCodeFence(text: string): string {
@@ -150,7 +198,7 @@ function parseTaskDraft(text: string): AiTaskDraft | null {
       ? parsed.subTasks
           .map((item) => String(item).trim())
           .filter(Boolean)
-          .slice(0, 4)
+          .slice(0, 6)
       : [];
     return { title, description, priority, subTasks };
   } catch {
@@ -170,43 +218,46 @@ function cleanSubTaskCandidate(value: string): string {
 
 function inferSubTasksFromNote(content: string | null | undefined): string[] {
   if (!content) return [];
-
   const candidates = content
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => /^([-*•]|\d+[.)]|\[[ xX]\])\s+/.test(line))
     .map(cleanSubTaskCandidate)
     .filter((line) => line.length >= 3 && line.length <= 90);
-
-  return [...new Set(candidates)].slice(0, 4);
+  return [...new Set(candidates)].slice(0, 6);
 }
 
-/**
- * Ask OpenRouter to categorise a single task.
- * Returns a Title-Case label (1-3 words) or null on any failure.
- */
+// ── Categorize Task ──────────────────────────────────────────────────────────
+
 export async function categorizeTask(
   title: string,
   description: string | null | undefined,
-  apiKey: string,
+  _apiKey?: string,
   existingCategories: readonly string[] = [],
 ): Promise<CategorizeTaskResult> {
   const cleanedExisting = existingCategories
-    .map((category) => normalizeCategoryLabel(category))
+    .map(normalizeCategoryLabel)
     .filter(Boolean);
+
   const prompt = [
-    "Categorize this task.",
-    "Return exactly one short category label in Title Case (1-3 words).",
-    "Examples: Work, Personal, Health, Finance, Learning, Shopping, Home, Social, Creative, Admin, Travel.",
+    "You are an expert productivity assistant. Categorize the following task into a single concise category.",
+    "",
+    "Rules:",
+    "1. Return ONLY the category label — no explanation, reasoning, quotes, or punctuation.",
+    "2. Use Title Case, 1-3 words maximum.",
+    "3. Think about the domain, context, and intent behind the task — not just keywords.",
+    "4. Consider these broad categories: Work, Personal, Health & Fitness, Finance, Learning, Shopping, Home & Household, Social, Creative, Admin & Errands, Travel, Career, Relationships, Self-Care, Technology, Meals & Cooking, Events & Planning.",
     cleanedExisting.length > 0
-      ? `Existing categories: ${cleanedExisting.join(", ")}. Reuse one of these exactly if it fits.`
-      : "There are no existing categories yet.",
-    "Only invent a new concise label when none of the existing categories fit.",
-    "Respond with only the category label. No explanation. No punctuation.",
-    `Title: ${title}`,
-    `Description: ${description || "none"}`,
-  ].join("\n");
-  const result = await requestOpenRouterText(prompt, apiKey);
+      ? `5. Existing categories: [${cleanedExisting.join(", ")}]. Strongly prefer reusing one of these if the task fits. Only create a new category when no existing one reasonably applies.`
+      : "5. No existing categories yet — pick the most fitting general category.",
+    "",
+    `Task title: ${title}`,
+    description ? `Task description: ${description}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const result = await requestAiText(prompt);
   if (!result.text) {
     return { category: null, model: result.model, error: result.error };
   }
@@ -218,60 +269,57 @@ export async function categorizeTask(
   return {
     category: category || null,
     model: result.model,
-    error: category ? null : "AI returned an empty category.",
+    error: category ? null : "Luna returned an empty category.",
   };
 }
+
+// ── Convert Note to Task ─────────────────────────────────────────────────────
 
 export async function convertNoteToTaskDraft(
   title: string,
   content: string | null | undefined,
-  apiKey: string,
+  _apiKey?: string,
 ): Promise<ConvertNoteToTaskResult> {
   const prompt = [
-    "Convert the note below into exactly one actionable task. Respond with raw JSON only — no markdown, no explanation.",
-    'Shape: {"title":"string","description":"string","priority":"low|medium|high","subTasks":["string"]}',
+    "You are a productivity expert. Convert the following note into a single well-structured, actionable task.",
+    "Respond with raw JSON only — no markdown fences, no commentary.",
     "",
-    "TITLE",
-    "- Begin with an action verb (Fix, Write, Schedule, Research, Review, Build, etc.)",
-    "- Capture the single primary goal in max 80 characters",
-    "- Never start with 'I need to' or 'I should'",
+    'Required JSON shape: {"title":"string","description":"string","priority":"low|medium|high","subTasks":["string"]}',
     "",
-    "DESCRIPTION",
-    "- 1–2 sentences of context, constraints, or acceptance criteria from the note",
-    "- Captures the 'why', hard requirements, or definition of done",
-    "- Do NOT repeat the title and do NOT list steps here",
-    '- Use empty string "" when the title alone is self-contained',
+    "=== TITLE ===",
+    "- Start with an imperative action verb: Build, Research, Schedule, Review, Draft, Fix, Organize, etc.",
+    "- Concisely capture the primary goal (max 80 characters)",
+    "- Never begin with 'I need to', 'I should', or 'Task to'",
+    "- Make it specific enough to be actionable on its own",
     "",
-    "PRIORITY",
-    "- high: has a near deadline, blocks something, or the note marks it urgent",
-    "- medium: clearly important but not immediately blocking",
-    "- low: nice-to-have, no time pressure",
+    "=== DESCRIPTION ===",
+    "- 1-3 sentences capturing context, constraints, acceptance criteria, or the 'why'",
+    "- Include deadlines, dependencies, or key requirements from the note",
+    "- Do NOT restate the title or list procedural steps",
+    '- Use "" (empty string) when the title is fully self-explanatory',
     "",
-    "SUB-TASKS",
-    "- Create subTasks whenever the note contains multiple concrete actions, a checklist, bullets, numbered steps, or errands that should be checked off separately",
-    "- A good sub-task is a short action the user can complete independently",
-    "- If the note includes 2-4 explicit action points, preserve them as subTasks instead of collapsing them into the description",
-    "- Prefer 1-3 subTasks when the note clearly implies a short sequence or checklist",
-    "What belongs in the DESCRIPTION instead of a sub-task:",
-    "  - Background context, motivation, or 'why'",
-    "  - Reference material, links, or notes for later",
-    "  - Constraints, requirements, or acceptance criteria",
-    "  - Any information the user needs but doesn't need to act on as a step",
-    "Sub-task count guide:",
-    "  0 sub-tasks: single-action note, vague idea, reminder, or reference material",
-    "  1–2 sub-tasks: note describes a short sequence with clearly distinct steps",
-    "  3–4 sub-tasks: note outlines a concrete multi-step process (rare)",
-    "Never split a continuous action into artificial micro-steps to fill the list.",
-    "Examples:",
-    '  - "Need to renew passport before June, gather photo, fill form, book appointment" -> title + 2-3 subTasks; deadline context stays in description',
-    '  - "Prepare tax return, use the 2025 income folder, check deductible expenses, submit online" -> title + subTasks for checking expenses and submitting; folder detail stays in description',
-    '  - "Remember to ask about vacation policy" -> one task, no subTasks',
+    "=== PRIORITY ===",
+    "- high: explicit urgency, near deadline, blocks other work, or marked important/urgent in the note",
+    "- medium: clearly important but not time-critical or blocking",
+    "- low: nice-to-have, someday/maybe, no pressure or deadline",
+    "- When in doubt, pick medium",
     "",
-    `Note title: ${title}`,
-    `Note content: ${content || "none"}`,
+    "=== SUB-TASKS ===",
+    "- Extract sub-tasks when the note lists distinct, independently completable actions (checklists, steps, errands)",
+    "- Each sub-task should be a clear action phrase (3-80 characters)",
+    "- Aim for 0-6 sub-tasks depending on note complexity:",
+    "  * 0: single-action note, vague idea, reminder, or pure reference material",
+    "  * 1-3: note describes a short sequence of clearly distinct steps",
+    "  * 4-6: note outlines a detailed multi-step process with many actionable items",
+    "- Do NOT create artificial sub-tasks by splitting one continuous action",
+    "- Context, motivation, reference links, and 'why' belong in the description, not as sub-tasks",
+    "",
+    "=== INPUT NOTE ===",
+    `Title: ${title}`,
+    `Content: ${content || "(empty)"}`,
   ].join("\n");
 
-  const result = await requestOpenRouterText(prompt, apiKey, 450);
+  const result = await requestAiText(prompt, 500);
   if (!result.text) {
     return { draft: null, model: result.model, error: result.error };
   }
@@ -281,16 +329,401 @@ export async function convertNoteToTaskDraft(
     return {
       draft: null,
       model: result.model,
-      error: `AI returned invalid task JSON: ${result.text.slice(0, 180)}`,
+      error: `Luna returned invalid JSON: ${result.text.slice(0, 180)}`,
     };
   }
 
   if (draft.subTasks.length === 0) {
-    const inferredSubTasks = inferSubTasksFromNote(content);
-    if (inferredSubTasks.length > 0) {
-      draft.subTasks = inferredSubTasks;
-    }
+    const inferred = inferSubTasksFromNote(content);
+    if (inferred.length > 0) draft.subTasks = inferred;
   }
 
   return { draft, model: result.model, error: null };
+}
+
+// ── Luna Chat ────────────────────────────────────────────────────────────────
+
+interface LunaTool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+const LUNA_TOOLS: LunaTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "create_task",
+      description:
+        "Create a new task for the user. Use when the user asks to create, add, or schedule a task.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "Task title — start with an action verb",
+          },
+          description: {
+            type: "string",
+            description: "Optional context or details",
+          },
+          priority: {
+            type: "string",
+            enum: ["low", "medium", "high"],
+            description: "Task priority (default medium)",
+          },
+          due_date: {
+            type: "string",
+            description: "Optional due date in YYYY-MM-DD format",
+          },
+          sub_tasks: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional list of sub-task titles",
+          },
+        },
+        required: ["title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_note",
+      description:
+        "Create a new note for the user. Use when the user asks to write down, save, remember, or jot something.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Note title" },
+          content: { type: "string", description: "Note body in markdown" },
+        },
+        required: ["title"],
+      },
+    },
+  },
+];
+
+export function buildLunaSystemPrompt(context: {
+  tasks: {
+    title: string;
+    priority: string;
+    due_date?: string | null;
+    completed: boolean;
+  }[];
+  notes: { title: string }[];
+}): string {
+  const taskLines = context.tasks
+    .slice(0, 30)
+    .map(
+      (t) =>
+        `- [${t.completed ? "x" : " "}] ${t.title} (${t.priority}${t.due_date ? `, due ${t.due_date}` : ""})`,
+    )
+    .join("\n");
+
+  const noteLines = context.notes
+    .slice(0, 20)
+    .map((n) => `- ${n.title}`)
+    .join("\n");
+
+  return [
+    "You are Luna, the smart and friendly AI assistant built into Orbit — a personal productivity app for managing tasks and notes.",
+    "",
+    "Your capabilities:",
+    "- Answer questions about the user's tasks, notes, priorities, and schedule",
+    "- Create new tasks and notes using the provided tool functions",
+    "- Give productivity advice: help prioritize, suggest time management strategies, break down large goals",
+    "- Summarize, analyze, and find patterns across the user's data",
+    "- Help with brainstorming, planning, and organizing ideas",
+    "- Chat freely on any topic the user brings up",
+    "",
+    "Guidelines:",
+    "- Be concise but thorough. Use markdown formatting (bold, lists, headers) when it helps readability.",
+    "- When creating tasks, write clear action-oriented titles starting with verbs. Set appropriate priorities and due dates when context allows.",
+    "- When creating notes, use markdown formatting for the content body.",
+    "- After using a tool, briefly confirm what was created.",
+    "- If the user's request is ambiguous, ask a clarifying question rather than guessing.",
+    "- Be warm and encouraging but not overly verbose.",
+    "",
+    `The user currently has ${context.tasks.length} task(s) and ${context.notes.length} note(s).`,
+    context.tasks.length > 0 ? `\nCurrent tasks:\n${taskLines}` : "",
+    context.notes.length > 0 ? `\nCurrent notes:\n${noteLines}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export interface StreamLunaChatOptions {
+  thinkingEnabled?: boolean;
+}
+
+export async function streamLunaChat(
+  messages: ChatMessage[],
+  _apiKey: string,
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal,
+  options?: StreamLunaChatOptions,
+): Promise<string | null> {
+  const settings = getAiSettings();
+  const apiKey = settings.keys[settings.provider]?.trim();
+  if (!apiKey) {
+    callbacks.onError("No API key configured. Go to Settings → Luna.");
+    return null;
+  }
+
+  const baseUrl = PROVIDERS[settings.provider].baseUrl;
+  const headers = getRequestHeaders(apiKey, settings.provider);
+
+  const models =
+    settings.provider === "openrouter"
+      ? getOpenRouterFallbackModels()
+      : [settings.model.deepseek];
+
+  const isDeepSeek = settings.provider === "deepseek";
+  const thinkingEnabled = isDeepSeek && !!options?.thinkingEnabled;
+
+  for (const model of models) {
+    try {
+      // Build request body
+      const body: Record<string, unknown> = {
+        model,
+        messages,
+        tools: LUNA_TOOLS,
+        stream: true,
+      };
+
+      if (thinkingEnabled) {
+        // Thinking mode: no temperature/top_p, higher max_tokens for CoT
+        body.thinking = { type: "enabled" };
+        body.max_tokens = 8192;
+      } else {
+        body.temperature = 0.5;
+        body.max_tokens = 1024;
+        if (isDeepSeek) {
+          body.thinking = { type: "disabled" };
+        }
+      }
+
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal,
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        if (res.status === 400 && body.includes("stream")) {
+          return await nonStreamingFallback(
+            messages,
+            baseUrl,
+            headers,
+            model,
+            callbacks,
+            signal,
+            options?.thinkingEnabled,
+          );
+        }
+        continue;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        callbacks.onError("No response stream available.");
+        return model;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+      let fullReasoning = "";
+      const toolCalls: Record<number, { name: string; arguments: string }> = {};
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data: ")) continue;
+          const payload = trimmed.slice(6);
+          if (payload === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(payload) as {
+              choices?: {
+                delta?: {
+                  content?: string;
+                  reasoning_content?: string;
+                  tool_calls?: {
+                    index: number;
+                    function?: { name?: string; arguments?: string };
+                  }[];
+                };
+              }[];
+              usage?: {
+                prompt_cache_hit_tokens?: number;
+                prompt_cache_miss_tokens?: number;
+              };
+            };
+
+            // Extract cache info from usage (DeepSeek returns this in the final chunk)
+            if (parsed.usage && callbacks.onCacheInfo) {
+              const hit = parsed.usage.prompt_cache_hit_tokens ?? 0;
+              const miss = parsed.usage.prompt_cache_miss_tokens ?? 0;
+              if (hit > 0 || miss > 0) {
+                callbacks.onCacheInfo({
+                  cacheHitTokens: hit,
+                  cacheMissTokens: miss,
+                });
+              }
+            }
+
+            const delta = parsed.choices?.[0]?.delta;
+            if (!delta) continue;
+
+            // Handle reasoning_content (DeepSeek thinking mode)
+            if (delta.reasoning_content && callbacks.onReasoningToken) {
+              fullReasoning += delta.reasoning_content;
+              callbacks.onReasoningToken(delta.reasoning_content);
+            }
+
+            if (delta.content) {
+              fullText += delta.content;
+              callbacks.onToken(delta.content);
+            }
+
+            if (delta.tool_calls) {
+              for (const tc of delta.tool_calls) {
+                const idx = tc.index;
+                if (!toolCalls[idx])
+                  toolCalls[idx] = { name: "", arguments: "" };
+                if (tc.function?.name) toolCalls[idx].name += tc.function.name;
+                if (tc.function?.arguments)
+                  toolCalls[idx].arguments += tc.function.arguments;
+              }
+            }
+          } catch {
+            // skip malformed SSE chunk
+          }
+        }
+      }
+
+      for (const tc of Object.values(toolCalls)) {
+        if (tc.name) {
+          try {
+            callbacks.onToolCall(
+              tc.name,
+              JSON.parse(tc.arguments) as Record<string, unknown>,
+            );
+          } catch {
+            callbacks.onToolCall(tc.name, {});
+          }
+        }
+      }
+
+      callbacks.onDone(fullText, fullReasoning || undefined);
+      return model;
+    } catch (err) {
+      if (signal?.aborted) {
+        callbacks.onError("Request cancelled.");
+        return null;
+      }
+      continue;
+    }
+  }
+
+  callbacks.onError(
+    "All models failed. Check your API key in Settings → Luna.",
+  );
+  return null;
+}
+
+async function nonStreamingFallback(
+  messages: ChatMessage[],
+  baseUrl: string,
+  headers: Record<string, string>,
+  model: string,
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal,
+  thinkingEnabled?: boolean,
+): Promise<string | null> {
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    tools: LUNA_TOOLS,
+  };
+
+  if (thinkingEnabled) {
+    body.thinking = { type: "enabled" };
+    body.max_tokens = 8192;
+  } else {
+    body.temperature = 0.5;
+    body.max_tokens = 1024;
+  }
+
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!res.ok) {
+    callbacks.onError(`${model} failed (${res.status}).`);
+    return null;
+  }
+
+  const data = (await res.json()) as {
+    model?: string;
+    choices?: {
+      message?: {
+        content?: string;
+        reasoning_content?: string;
+        tool_calls?: { function: { name: string; arguments: string } }[];
+      };
+    }[];
+    usage?: {
+      prompt_cache_hit_tokens?: number;
+      prompt_cache_miss_tokens?: number;
+    };
+  };
+
+  const msg = data.choices?.[0]?.message;
+  if (msg?.tool_calls) {
+    for (const tc of msg.tool_calls) {
+      try {
+        callbacks.onToolCall(
+          tc.function.name,
+          JSON.parse(tc.function.arguments) as Record<string, unknown>,
+        );
+      } catch {
+        callbacks.onToolCall(tc.function.name, {});
+      }
+    }
+  }
+
+  if (
+    data.usage &&
+    (data.usage.prompt_cache_hit_tokens || data.usage.prompt_cache_miss_tokens)
+  ) {
+    callbacks.onCacheInfo?.({
+      cacheHitTokens: data.usage.prompt_cache_hit_tokens ?? 0,
+      cacheMissTokens: data.usage.prompt_cache_miss_tokens ?? 0,
+    });
+  }
+
+  const text = msg?.content?.trim() ?? "";
+  const reasoning = msg?.reasoning_content?.trim() || undefined;
+  if (reasoning) callbacks.onReasoningToken?.(reasoning);
+  if (text) callbacks.onToken(text);
+  callbacks.onDone(text, reasoning);
+  return data.model ?? model;
 }

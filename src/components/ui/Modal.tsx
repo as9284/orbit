@@ -109,7 +109,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pb-[calc(4rem+env(safe-area-inset-bottom))] sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -150,7 +150,7 @@ export function Modal({
             <X size={15} />
           </button>
         </div>
-        <div className="p-5 sm:p-6 overflow-y-auto flex-1 min-h-0">
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 min-h-0 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6">
           {children}
         </div>
       </div>

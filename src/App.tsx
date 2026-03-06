@@ -6,6 +6,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ArchivePage } from "./pages/ArchivePage";
 import { NotesPage } from "./pages/NotesPage";
+import { LunaPage } from "./pages/LunaPage";
 import { Spinner } from "./components/ui/Spinner";
 
 function AppContent() {
@@ -26,6 +27,7 @@ function AppContent() {
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="notes" element={<NotesPage />} />
+        <Route path="luna" element={<LunaPage />} />
         <Route path="archive" element={<ArchivePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

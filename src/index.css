@@ -249,3 +249,85 @@ input[type="date"] {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Luna chat markdown prose */
+.prose-luna {
+  line-height: 1.65;
+  word-break: break-word;
+}
+.prose-luna p {
+  margin: 0.35em 0;
+}
+.prose-luna p:first-child {
+  margin-top: 0;
+}
+.prose-luna p:last-child {
+  margin-bottom: 0;
+}
+.prose-luna strong {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+}
+.prose-luna em {
+  color: rgba(255, 255, 255, 0.7);
+}
+.prose-luna code {
+  font-size: 0.85em;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 0.15em 0.4em;
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+}
+.prose-luna pre {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.prose-luna pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.82em;
+}
+.prose-luna ul,
+.prose-luna ol {
+  padding-left: 1.4em;
+  margin: 0.35em 0;
+}
+.prose-luna li {
+  margin: 0.15em 0;
+}
+.prose-luna a {
+  color: rgb(167, 139, 250);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-luna a:hover {
+  color: rgb(196, 181, 253);
+}
+.prose-luna blockquote {
+  border-left: 3px solid rgba(139, 92, 246, 0.3);
+  padding-left: 0.75em;
+  margin: 0.5em 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+.prose-luna h1,
+.prose-luna h2,
+.prose-luna h3 {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 700;
+  margin: 0.6em 0 0.3em;
+}
+.prose-luna h1 {
+  font-size: 1.15em;
+}
+.prose-luna h2 {
+  font-size: 1.05em;
+}
+.prose-luna h3 {
+  font-size: 0.95em;
+}

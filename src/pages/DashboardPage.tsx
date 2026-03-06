@@ -12,7 +12,7 @@ import {
   X,
   ListTodo,
 } from "lucide-react";
-import { getOpenRouterKey } from "../lib/openrouter";
+import { isFeatureReady } from "../lib/ai";
 import { isPast, isToday, parseISO } from "date-fns";
 import { useTasksApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
@@ -61,6 +61,15 @@ export function DashboardPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [previewTask, setPreviewTask] = useState<Task | null>(null);
+
+  // Re-render when AI settings change so feature checks update immediately
+  const [, setAiTick] = useState(0);
+  useEffect(() => {
+    const handler = () => setAiTick((t) => t + 1);
+    window.addEventListener("orbit:ai:changed", handler);
+    return () => window.removeEventListener("orbit:ai:changed", handler);
+  }, []);
+
   const [filter, setFilter] = useState<Filter>(() => {
     return sanitizeStoredFilter(localStorage.getItem("orbit:dashboard:filter"));
   });
@@ -96,7 +105,7 @@ export function DashboardPage() {
   }, [api.activeTasks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (api.aiStatus && api.aiStatus.startsWith("Using ")) {
+    if (api.aiStatus && api.aiStatus.startsWith("Luna via ")) {
       return;
     }
     if (api.aiStatus) {
@@ -434,7 +443,7 @@ export function DashboardPage() {
             </button>
           )}
           {!api.isCategorizingBackground &&
-            getOpenRouterKey() &&
+            isFeatureReady("autoCategorize") &&
             api.activeTasks.some((t) => !api.categories[t.id]) && (
               <button
                 onClick={() => void api.backgroundCategorize(api.activeTasks)}
@@ -448,7 +457,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      {api.aiStatus && !api.aiStatus.startsWith("Using ") && (
+      {api.aiStatus && !api.aiStatus.startsWith("Luna via ") && (
         <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/6 px-3 py-2 text-xs text-amber-200/80">
           {api.aiStatus}
         </div>

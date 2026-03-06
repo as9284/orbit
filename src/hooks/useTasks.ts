@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { encrypt, decrypt } from "../lib/encryption";
-import { getOpenRouterKey, categorizeTask } from "../lib/openrouter";
+import { isFeatureReady, getActiveApiKey } from "../lib/ai";
+import { categorizeTask } from "../lib/openrouter";
 import type { Task, SubTask } from "../types/database.types";
 
 export interface CreateTaskData {
@@ -107,8 +108,7 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
   const backgroundCategorize = useCallback(
     async (tasks: Task[]) => {
       if (categorizingRef.current) return;
-      const apiKey = getOpenRouterKey();
-      if (!apiKey) return;
+      if (!isFeatureReady("autoCategorize")) return;
       categorizingRef.current = true;
       setIsCategorizingBackground(true);
       setAiStatus(null);
@@ -129,21 +129,21 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
           const result = await categorizeTask(
             task.title,
             task.description,
-            apiKey,
+            undefined,
             existingCategories,
           );
           if (result.category) {
             pruned[task.id] = result.category;
             writeStoredCategories(pruned);
             if (result.model) {
-              setAiStatus(`Using ${result.model}`);
+              setAiStatus(`Luna via ${result.model}`);
             }
             continue;
           }
 
           if (result.error) {
             setAiStatus(result.error);
-            setError(`AI categorization failed: ${result.error}`);
+            setError(`Luna categorization failed: ${result.error}`);
             break;
           }
         }
@@ -165,12 +165,12 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
       title: string;
       description?: string | null;
     }) => {
-      const apiKey = getOpenRouterKey();
+      const apiKey = getActiveApiKey();
       if (!apiKey) {
         return {
           category: null,
           model: null,
-          error: "Missing OpenRouter API key.",
+          error: "Missing API key — configure one in Settings → Luna.",
         };
       }
 
@@ -179,21 +179,21 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
       const result = await categorizeTask(
         title,
         description,
-        apiKey,
+        undefined,
         existingCategories,
       );
       if (result.category) {
         stored[taskId] = result.category;
         writeStoredCategories(stored);
         if (result.model) {
-          setAiStatus(`Using ${result.model}`);
+          setAiStatus(`Luna via ${result.model}`);
         }
         return result;
       }
 
       if (result.error) {
         setAiStatus(result.error);
-        setError(`AI categorization failed: ${result.error}`);
+        setError(`Luna categorization failed: ${result.error}`);
       }
 
       return result;

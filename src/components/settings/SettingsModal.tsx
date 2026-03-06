@@ -1,4 +1,10 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Modal } from "../ui/Modal";
 import { Spinner } from "../ui/Spinner";
 import { supabase } from "../../lib/supabase";
@@ -24,12 +30,19 @@ import {
   AlertCircle,
   BrainCircuit,
   ExternalLink,
+  LogOut,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import {
-  getOpenRouterKey,
-  setOpenRouterKey,
-  AI_MODEL,
-} from "../../lib/openrouter";
+  getAiSettings,
+  saveAiSettings,
+  PROVIDERS,
+  PROVIDER_LIST,
+  type AiSettings,
+  type ProviderId,
+  type ModelConfig,
+} from "../../lib/ai";
 
 type Tab = "account" | "security" | "ai" | "danger";
 
@@ -40,23 +53,33 @@ interface Props {
 
 export function SettingsModal({ open, onClose }: Props) {
   const [tab, setTab] = useState<Tab>("account");
-  const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
+  const TABS: {
+    id: Tab;
+    label: string;
+    shortLabel?: string;
+    icon: ReactNode;
+  }[] = [
     { id: "account", label: "Account", icon: <User size={12} /> },
     { id: "security", label: "Security", icon: <ShieldCheck size={12} /> },
-    { id: "ai", label: "AI", icon: <BrainCircuit size={12} /> },
-    { id: "danger", label: "Danger zone", icon: <Trash2 size={12} /> },
+    { id: "ai", label: "Luna", icon: <BrainCircuit size={12} /> },
+    {
+      id: "danger",
+      label: "Danger zone",
+      shortLabel: "Danger",
+      icon: <Trash2 size={12} />,
+    },
   ];
 
   return (
     <Modal open={open} onClose={onClose} title="Settings" maxWidth="max-w-md">
       {/* Tab bar */}
-      <div className="flex gap-1 mb-5 p-1 bg-white/4 border border-white/[0.07] rounded-xl">
-        {TABS.map(({ id, label, icon }) => (
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 mb-5 p-1 bg-white/4 border border-white/[0.07] rounded-xl">
+        {TABS.map(({ id, label, shortLabel, icon }) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
               tab === id
                 ? id === "danger"
                   ? "bg-red-500/15 text-red-400 shadow-sm shadow-red-500/10"
@@ -67,7 +90,8 @@ export function SettingsModal({ open, onClose }: Props) {
             }`}
           >
             {icon}
-            {label}
+            <span className="sm:hidden">{shortLabel ?? label}</span>
+            <span className="hidden sm:inline">{label}</span>
           </button>
         ))}
       </div>
@@ -83,7 +107,7 @@ export function SettingsModal({ open, onClose }: Props) {
 // ── Account Tab ───────────────────────────────────────────────────────────────
 
 function AccountTab() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   const currentName: string = user?.user_metadata?.full_name ?? "";
   const currentEmail: string = user?.email ?? "";
@@ -253,6 +277,18 @@ function AccountTab() {
           </div>
         )}
       </SettingsSection>
+
+      {/* Sign out */}
+      <div className="pt-1">
+        <button
+          type="button"
+          onClick={signOut}
+          className="flex items-center gap-2 w-full px-3.5 py-2.5 rounded-xl border border-red-500/15 bg-red-500/5 text-xs font-semibold text-red-400/70 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/25 transition-all duration-200"
+        >
+          <LogOut size={13} strokeWidth={1.8} />
+          Sign out
+        </button>
+      </div>
     </div>
   );
 }
@@ -564,22 +600,54 @@ function SecurityTab() {
   );
 }
 
-// ── AI Tab ────────────────────────────────────────────────────────────────────
+// ── Luna Tab ──────────────────────────────────────────────────────────────────
 
 function AITab() {
   const { user } = useAuth();
-  const [apiKey, setApiKeyLocal] = useState(() => getOpenRouterKey());
+  const [settings, setSettings] = useState<AiSettings>(getAiSettings);
   const [show, setShow] = useState(false);
-  const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [cleared, setCleared] = useState(false);
 
-  const handleSave = (e: FormEvent) => {
+  const provider = PROVIDERS[settings.provider];
+  const currentKey = settings.keys[settings.provider] ?? "";
+
+  const update = (patch: Partial<AiSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveAiSettings(next);
+      return next;
+    });
+  };
+
+  const handleProviderChange = (id: ProviderId) => {
+    update({ provider: id });
+  };
+
+  const handleKeyChange = (value: string) => {
+    const keys = { ...settings.keys, [settings.provider]: value };
+    update({ keys });
+    setSaved(false);
+  };
+
+  const handleKeySave = (e: FormEvent) => {
     e.preventDefault();
-    setOpenRouterKey(apiKey);
-    setDirty(false);
+    saveAiSettings(settings);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
+  };
+
+  const handleModelChange = (modelId: string) => {
+    const model = { ...settings.model, [settings.provider]: modelId };
+    update({ model });
+  };
+
+  const handleToggleFeature = (feature: keyof typeof settings.features) => {
+    const features = {
+      ...settings.features,
+      [feature]: !settings.features[feature],
+    };
+    update({ features });
   };
 
   const handleClearCategories = () => {
@@ -592,30 +660,43 @@ function AITab() {
     setTimeout(() => setCleared(false), 3000);
   };
 
-  const hasSavedKey = !!getOpenRouterKey();
-
   return (
     <div className="space-y-4">
-      {/* API key field */}
-      <SettingsSection label="OpenRouter API key">
-        <form onSubmit={handleSave} className="space-y-2.5">
-          <div
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border transition-colors duration-200 ${
-              dirty
-                ? "border-violet-500/30 bg-white/5"
-                : "border-white/8 bg-white/4"
-            }`}
-          >
+      {/* Provider selector */}
+      <SettingsSection label="AI provider">
+        <div className="grid grid-cols-2 gap-2">
+          {PROVIDER_LIST.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => handleProviderChange(p.id)}
+              className={`text-left px-3 py-2.5 rounded-xl border transition-all duration-200 ${
+                settings.provider === p.id
+                  ? "border-violet-500/40 bg-violet-500/10"
+                  : "border-white/8 bg-white/[0.035] hover:border-white/15"
+              }`}
+            >
+              <span className="text-xs font-semibold text-white/80">
+                {p.label}
+              </span>
+              <p className="text-[10px] text-white/30 mt-0.5 leading-snug">
+                {p.description}
+              </p>
+            </button>
+          ))}
+        </div>
+      </SettingsSection>
+
+      {/* API key */}
+      <SettingsSection label={`${provider.label} API key`}>
+        <form onSubmit={handleKeySave} className="space-y-2.5">
+          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-white/8 bg-white/4 focus-within:border-violet-500/30 focus-within:bg-white/5 transition-colors duration-200">
             <input
               type={show ? "text" : "password"}
-              value={apiKey}
-              placeholder="sk-or-…"
+              value={currentKey}
+              placeholder={provider.keyPlaceholder}
               autoComplete="off"
-              onChange={(e) => {
-                setApiKeyLocal(e.target.value);
-                setDirty(true);
-                setSaved(false);
-              }}
+              onChange={(e) => handleKeyChange(e.target.value)}
               className="flex-1 min-w-0 bg-transparent text-white/90 text-sm placeholder:text-white/25 outline-none font-mono"
             />
             <button
@@ -629,7 +710,7 @@ function AITab() {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <PrimaryBtn loading={false} disabled={!dirty || !apiKey.trim()}>
+            <PrimaryBtn loading={false} disabled={!currentKey.trim()}>
               Save key
             </PrimaryBtn>
             {saved && (
@@ -639,69 +720,116 @@ function AITab() {
             )}
           </div>
         </form>
+
         {/* How-to guide */}
         <div className="mt-3 rounded-xl border border-white/[0.07] bg-white/2.5 p-3.5 space-y-2.5">
           <p className="text-[11px] font-semibold text-white/40 uppercase tracking-widest">
-            How to get a free key
+            How to get a key
           </p>
           <ol className="space-y-1.5">
-            {[
-              <>
-                Go to{" "}
-                <a
-                  href="https://openrouter.ai"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-violet-400/80 hover:text-violet-300 transition-colors inline-flex items-center gap-0.5"
-                >
-                  openrouter.ai <ExternalLink size={10} />
-                </a>{" "}
-                and create a free account
-              </>,
-              <>
-                Open <span className="text-white/55 font-medium">Keys</span> in
-                the left sidebar
-              </>,
-              <>
-                Click{" "}
-                <span className="text-white/55 font-medium">Create key</span>,
-                give it any name
-              </>,
-              <>Copy the key and paste it above — no credit card required</>,
-            ].map((step, i) => (
+            {provider.docsSteps.map((step, i) => (
               <li key={i} className="flex items-start gap-2">
                 <span className="shrink-0 w-4 h-4 mt-0.5 flex items-center justify-center rounded-full bg-violet-500/15 text-violet-400/80 text-[9px] font-bold">
                   {i + 1}
                 </span>
                 <span className="text-[11px] text-white/35 leading-relaxed">
-                  {step}
+                  {i === 0 ? (
+                    <>
+                      Go to{" "}
+                      <a
+                        href={provider.docsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-violet-400/80 hover:text-violet-300 transition-colors inline-flex items-center gap-0.5"
+                      >
+                        {provider.docsUrl.replace("https://", "")}{" "}
+                        <ExternalLink size={10} />
+                      </a>{" "}
+                      and create an account
+                    </>
+                  ) : (
+                    step
+                  )}
                 </span>
               </li>
             ))}
           </ol>
           <p className="text-[10px] text-white/20 leading-relaxed pt-0.5 border-t border-white/6">
             Your key is stored only in this browser and never sent to our
-            servers. Only task titles and descriptions are sent to OpenRouter.
+            servers. Luna sends only task titles and descriptions to{" "}
+            {provider.label}.
           </p>
         </div>
       </SettingsSection>
 
-      {/* Model info */}
+      {/* Model selector */}
       <SettingsSection label="Model">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-white/55 font-mono">{AI_MODEL}</span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
-            Free
-          </span>
+        <ModelDropdown
+          models={provider.models}
+          value={settings.model[settings.provider] ?? provider.defaultModel}
+          onChange={handleModelChange}
+        />
+      </SettingsSection>
+
+      {/* Feature toggles */}
+      <SettingsSection label="Features">
+        <div className="space-y-2">
+          {[
+            {
+              key: "autoCategorize" as const,
+              label: "Auto-categorize tasks",
+              desc: "Luna automatically assigns a category to new tasks",
+            },
+            {
+              key: "noteToTask" as const,
+              label: "Note → Task conversion",
+              desc: "Convert notes into structured tasks with Luna",
+            },
+            {
+              key: "lunaChat" as const,
+              label: "Luna chat",
+              desc: "Chat with Luna to manage tasks and get advice",
+            },
+          ].map(({ key, label, desc }) => (
+            <label
+              key={key}
+              className="flex items-center justify-between gap-3 py-1.5 cursor-pointer group"
+            >
+              <div className="min-w-0">
+                <span className="text-xs text-white/70 font-medium group-hover:text-white/90 transition-colors">
+                  {label}
+                </span>
+                <p className="text-[10px] text-white/25 mt-0.5 leading-snug">
+                  {desc}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.features[key]}
+                onClick={() => handleToggleFeature(key)}
+                className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 ${
+                  settings.features[key] ? "bg-violet-500" : "bg-white/10"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                    settings.features[key] ? "translate-x-4" : ""
+                  }`}
+                />
+              </button>
+            </label>
+          ))}
         </div>
-        <p className="text-[11px] text-white/25 mt-2 leading-relaxed">
-          Tasks are categorised automatically in the background when an API key
-          is present. Only titles and descriptions are sent.
-        </p>
+        {!currentKey.trim() && (
+          <p className="text-[10px] text-amber-400/60 mt-2">
+            Add an API key above to enable Luna features.
+          </p>
+        )}
       </SettingsSection>
 
       {/* Clear categories */}
-      {hasSavedKey && (
+      {currentKey.trim() && settings.features.autoCategorize && (
         <SettingsSection label="Categories">
           {cleared ? (
             <InlineAlert
@@ -712,7 +840,7 @@ function AITab() {
           ) : (
             <div className="flex items-center justify-between">
               <span className="text-xs text-white/40">
-                Clear stored categories and re-run AI analysis
+                Clear Luna categories and re-run analysis
               </span>
               <button
                 type="button"
@@ -829,6 +957,121 @@ function DangerTab({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </form>
+      )}
+    </div>
+  );
+}
+
+// ── Model Dropdown ────────────────────────────────────────────────────────────
+
+function ModelDropdown({
+  models,
+  value,
+  onChange,
+}: {
+  models: ModelConfig[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = models.find((m) => m.id === value) ?? models[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const onMouse = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onMouse);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onMouse);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs transition-all duration-200 ${
+          open
+            ? "border-violet-500/30 bg-white/[0.06]"
+            : "border-white/8 bg-white/[0.04] hover:border-white/15"
+        }`}
+      >
+        <span className="flex-1 text-left text-white/80 font-medium">
+          {selected?.label ?? value}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          {selected?.free && (
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/15 text-[9px] font-semibold text-emerald-400/80 uppercase tracking-wider">
+              Free
+            </span>
+          )}
+          {selected?.supportsThinking && (
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/15 text-[9px] font-semibold text-amber-400/80 uppercase tracking-wider">
+              Think
+            </span>
+          )}
+        </div>
+        <ChevronDown
+          size={12}
+          className={`shrink-0 text-white/30 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="absolute z-20 top-full left-0 right-0 mt-1.5 rounded-xl border border-white/[0.09] bg-orbit-900 shadow-2xl shadow-black/60 overflow-hidden">
+          {models.map((m) => {
+            const active = m.id === value;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  onChange(m.id);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs transition-colors duration-150 ${
+                  active
+                    ? "bg-violet-500/10 text-white/90"
+                    : "text-white/55 hover:bg-white/[0.05] hover:text-white/80"
+                }`}
+              >
+                <span
+                  className={`shrink-0 w-3.5 flex items-center justify-center ${
+                    active ? "text-violet-400" : "text-transparent"
+                  }`}
+                >
+                  <Check size={11} />
+                </span>
+                <span className="flex-1 text-left font-medium">{m.label}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  {m.free && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/15 text-[9px] font-semibold text-emerald-400/80 uppercase tracking-wider">
+                      Free
+                    </span>
+                  )}
+                  {m.supportsThinking && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/15 text-[9px] font-semibold text-amber-400/80 uppercase tracking-wider">
+                      Think
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );
