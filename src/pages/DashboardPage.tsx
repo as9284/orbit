@@ -6,11 +6,11 @@ import {
   Circle,
   Clock,
   AlertCircle,
-  ListTodo,
   Sparkles,
   ChevronDown,
   Tag,
   X,
+  ListTodo,
 } from "lucide-react";
 import { getOpenRouterKey } from "../lib/openrouter";
 import { isPast, isToday, parseISO } from "date-fns";
@@ -279,58 +279,43 @@ export function DashboardPage() {
         </button>
       </div>
 
-      {/* Stats + Progress */}
-      <div className="mb-8 animate-fade-in" style={{ animationDelay: "50ms" }}>
-        {/* Progress bar */}
+      {/* Stats strip */}
+      <div
+        className="flex items-center gap-2.5 flex-wrap mb-7 animate-fade-in"
+        style={{ animationDelay: "50ms" }}
+      >
+        <StatPill
+          icon={<Circle size={12} />}
+          value={stats.active}
+          label="active"
+          iconClass="text-blue-400/70"
+        />
+        <StatPill
+          icon={<AlertCircle size={12} />}
+          value={stats.overdue}
+          label="overdue"
+          iconClass={stats.overdue > 0 ? "text-red-400/80" : "text-white/20"}
+          dim={stats.overdue === 0}
+        />
+        <StatPill
+          icon={<CheckCircle2 size={12} />}
+          value={stats.completed}
+          label="done"
+          iconClass="text-emerald-400/70"
+        />
         {stats.total > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-xs text-white/35 font-medium">
-                Progress
-              </span>
-              <span className="text-xs text-white/55 font-semibold tabular-nums">
-                {progressPercent}%
-              </span>
-            </div>
-            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="flex-1 min-w-25 flex items-center gap-2.5 ml-1">
+            <div className="flex-1 h-1 bg-white/6 rounded-full overflow-hidden">
               <div
-                className="h-full bg-linear-to-r from-violet-500 to-blue-500 rounded-full transition-all duration-700 ease-out shadow-[0_0_8px_rgba(139,92,246,0.3)]"
+                className="h-full bg-linear-to-r from-violet-500 to-blue-500 rounded-full transition-all duration-700 ease-out"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
+            <span className="text-[11px] text-white/30 font-semibold tabular-nums shrink-0">
+              {progressPercent}%
+            </span>
           </div>
         )}
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard
-            label="Total"
-            value={stats.total}
-            icon={<ListTodo size={14} />}
-            color="border-l-white/15"
-          />
-          <StatCard
-            label="Active"
-            value={stats.active}
-            icon={<Circle size={14} />}
-            color="border-l-blue-500/40"
-          />
-          <StatCard
-            label="Done"
-            value={stats.completed}
-            icon={<CheckCircle2 size={14} />}
-            color="border-l-emerald-500/50"
-            valueColor="text-emerald-400"
-          />
-          <StatCard
-            label="Overdue"
-            value={stats.overdue}
-            icon={<AlertCircle size={14} />}
-            color={
-              stats.overdue > 0 ? "border-l-red-500/50" : "border-l-white/15"
-            }
-            valueColor={stats.overdue > 0 ? "text-red-400" : undefined}
-          />
-        </div>
       </div>
 
       {/* Filter + sort bar */}
@@ -530,30 +515,28 @@ export function DashboardPage() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-interface StatCardProps {
-  label: string;
-  value: number;
+interface StatPillProps {
   icon: React.ReactNode;
-  color: string;
-  valueColor?: string;
+  value: number;
+  label: string;
+  iconClass: string;
+  dim?: boolean;
 }
 
-function StatCard({ label, value, icon, color, valueColor }: StatCardProps) {
+function StatPill({ icon, value, label, iconClass, dim }: StatPillProps) {
   return (
     <div
-      className={`relative bg-white/3.5 border border-white/7 border-l-2 ${color} rounded-2xl px-4 py-4 overflow-hidden hover:bg-white/6 hover:border-white/10 transition-all duration-300 group`}
+      className={`flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.035] border border-white/[0.07] rounded-xl transition-opacity duration-200 ${
+        dim ? "opacity-40" : ""
+      }`}
     >
-      <div className="flex items-center gap-1.5 text-white/30 mb-2">
-        {icon}
-        <span className="text-[10px] uppercase tracking-widest font-semibold">
-          {label}
-        </span>
-      </div>
-      <p
-        className={`text-2xl font-bold tabular-nums ${valueColor ?? "text-white/80"}`}
-      >
+      <span className={iconClass}>{icon}</span>
+      <span className="text-sm font-bold text-white/80 tabular-nums leading-none">
         {value}
-      </p>
+      </span>
+      <span className="text-[10px] text-white/30 font-medium leading-none">
+        {label}
+      </span>
     </div>
   );
 }
