@@ -57,7 +57,7 @@ export interface StreamCallbacks {
   onToolCall: (
     name: string,
     args: Record<string, unknown>,
-  ) => void | Promise<void>;
+  ) => string | Promise<string>;
   onDone: (fullText: string, reasoning?: string) => void;
   onError: (error: string) => void;
   onCacheInfo?: (info: CacheInfo) => void;
@@ -491,153 +491,223 @@ export async function streamLunaChat(
 
   for (const model of models) {
     try {
-      // Build request body
-      const body: Record<string, unknown> = {
-        model,
-        messages,
-        tools: LUNA_TOOLS,
-        stream: true,
-      };
+      // Local type for messages sent to the API (superset of ChatMessage).
+      // tool/assistant-with-tool_calls messages are only added in follow-up rounds.
+      type ApiMessage =
+        | { role: "system" | "user"; content: string }
+        | {
+            role: "assistant";
+            content: string | null;
+            tool_calls?: {
+              id: string;
+              type: "function";
+              function: { name: string; arguments: string };
+            }[];
+          }
+        | { role: "tool"; content: string; tool_call_id: string };
 
-      if (thinkingEnabled) {
-        // Thinking mode: no temperature/top_p, higher max_tokens for CoT
-        body.thinking = { type: "enabled" };
-        body.max_tokens = 8192;
-      } else {
-        body.temperature = 0.5;
-        body.max_tokens = 1024;
-        if (isDeepSeek) {
-          body.thinking = { type: "disabled" };
-        }
-      }
+      let currentMessages: ApiMessage[] = messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      let accumText = "";
+      let accumReasoning = "";
+      let modelFailed = false;
 
-      const res = await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-        signal,
-      });
+      // Agentic loop: keep going until model responds with text (no tool calls)
+      // or we hit the round cap. Each round may call tools and loop back.
+      for (let round = 0; round < 5; round++) {
+        const body: Record<string, unknown> = {
+          model,
+          messages: currentMessages,
+          tools: LUNA_TOOLS,
+          stream: true,
+        };
 
-      if (!res.ok) {
-        const body = await res.text();
-        if (res.status === 400 && body.includes("stream")) {
-          return await nonStreamingFallback(
-            messages,
-            baseUrl,
-            headers,
-            model,
-            callbacks,
-            signal,
-            options?.thinkingEnabled,
-          );
-        }
-        continue;
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) {
-        callbacks.onError("No response stream available.");
-        return model;
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullText = "";
-      let fullReasoning = "";
-      const toolCalls: Record<number, { name: string; arguments: string }> = {};
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data: ")) continue;
-          const payload = trimmed.slice(6);
-          if (payload === "[DONE]") continue;
-
-          try {
-            const parsed = JSON.parse(payload) as {
-              choices?: {
-                delta?: {
-                  content?: string;
-                  reasoning_content?: string;
-                  tool_calls?: {
-                    index: number;
-                    function?: { name?: string; arguments?: string };
-                  }[];
-                };
-              }[];
-              usage?: {
-                prompt_cache_hit_tokens?: number;
-                prompt_cache_miss_tokens?: number;
-              };
-            };
-
-            // Extract cache info from usage (DeepSeek returns this in the final chunk)
-            if (parsed.usage && callbacks.onCacheInfo) {
-              const hit = parsed.usage.prompt_cache_hit_tokens ?? 0;
-              const miss = parsed.usage.prompt_cache_miss_tokens ?? 0;
-              if (hit > 0 || miss > 0) {
-                callbacks.onCacheInfo({
-                  cacheHitTokens: hit,
-                  cacheMissTokens: miss,
-                });
-              }
-            }
-
-            const delta = parsed.choices?.[0]?.delta;
-            if (!delta) continue;
-
-            // Handle reasoning_content (DeepSeek thinking mode)
-            if (delta.reasoning_content && callbacks.onReasoningToken) {
-              fullReasoning += delta.reasoning_content;
-              callbacks.onReasoningToken(delta.reasoning_content);
-            }
-
-            if (delta.content) {
-              fullText += delta.content;
-              callbacks.onToken(delta.content);
-            }
-
-            if (delta.tool_calls) {
-              for (const tc of delta.tool_calls) {
-                const idx = tc.index;
-                if (!toolCalls[idx])
-                  toolCalls[idx] = { name: "", arguments: "" };
-                if (tc.function?.name) toolCalls[idx].name += tc.function.name;
-                if (tc.function?.arguments)
-                  toolCalls[idx].arguments += tc.function.arguments;
-              }
-            }
-          } catch {
-            // skip malformed SSE chunk
+        if (thinkingEnabled) {
+          // Thinking mode: no temperature/top_p, higher max_tokens for CoT
+          body.thinking = { type: "enabled" };
+          body.max_tokens = 8192;
+        } else {
+          body.temperature = 0.5;
+          body.max_tokens = 1024;
+          if (isDeepSeek) {
+            body.thinking = { type: "disabled" };
           }
         }
-      }
 
-      const toolCallPromises: Promise<void>[] = [];
-      for (const tc of Object.values(toolCalls)) {
-        if (tc.name) {
-          try {
-            const result = callbacks.onToolCall(
-              tc.name,
-              JSON.parse(tc.arguments) as Record<string, unknown>,
+        const res = await fetch(`${baseUrl}/chat/completions`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+          signal,
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          if (res.status === 400 && errText.includes("stream")) {
+            return await nonStreamingFallback(
+              messages,
+              baseUrl,
+              headers,
+              model,
+              callbacks,
+              signal,
+              options?.thinkingEnabled,
             );
-            if (result) toolCallPromises.push(result);
-          } catch {
-            const result = callbacks.onToolCall(tc.name, {});
-            if (result) toolCallPromises.push(result);
+          }
+          modelFailed = true;
+          break;
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) {
+          callbacks.onError("No response stream available.");
+          return model;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let roundText = "";
+        let roundReasoning = "";
+        const toolCalls: Record<
+          number,
+          { id: string; name: string; arguments: string }
+        > = {};
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data: ")) continue;
+            const payload = trimmed.slice(6);
+            if (payload === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(payload) as {
+                choices?: {
+                  delta?: {
+                    content?: string;
+                    reasoning_content?: string;
+                    tool_calls?: {
+                      index: number;
+                      id?: string;
+                      function?: { name?: string; arguments?: string };
+                    }[];
+                  };
+                }[];
+                usage?: {
+                  prompt_cache_hit_tokens?: number;
+                  prompt_cache_miss_tokens?: number;
+                };
+              };
+
+              // Extract cache info (DeepSeek returns this in the final chunk)
+              if (parsed.usage && callbacks.onCacheInfo) {
+                const hit = parsed.usage.prompt_cache_hit_tokens ?? 0;
+                const miss = parsed.usage.prompt_cache_miss_tokens ?? 0;
+                if (hit > 0 || miss > 0) {
+                  callbacks.onCacheInfo({
+                    cacheHitTokens: hit,
+                    cacheMissTokens: miss,
+                  });
+                }
+              }
+
+              const delta = parsed.choices?.[0]?.delta;
+              if (!delta) continue;
+
+              if (delta.reasoning_content && callbacks.onReasoningToken) {
+                roundReasoning += delta.reasoning_content;
+                callbacks.onReasoningToken(delta.reasoning_content);
+              }
+
+              if (delta.content) {
+                roundText += delta.content;
+                callbacks.onToken(delta.content);
+              }
+
+              if (delta.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  const idx = tc.index;
+                  if (!toolCalls[idx])
+                    toolCalls[idx] = { id: "", name: "", arguments: "" };
+                  // id only arrives on the first chunk for each tool call
+                  if (tc.id) toolCalls[idx].id = tc.id;
+                  if (tc.function?.name)
+                    toolCalls[idx].name += tc.function.name;
+                  if (tc.function?.arguments)
+                    toolCalls[idx].arguments += tc.function.arguments;
+                }
+              }
+            } catch {
+              // skip malformed SSE chunk
+            }
           }
         }
-      }
-      await Promise.all(toolCallPromises);
 
-      callbacks.onDone(fullText, fullReasoning || undefined);
+        accumText += roundText;
+        accumReasoning += roundReasoning;
+
+        const toolCallEntries = Object.values(toolCalls).filter(
+          (tc) => tc.name,
+        );
+
+        if (toolCallEntries.length === 0) {
+          // No tool calls — the model produced its final text response
+          callbacks.onDone(accumText, accumReasoning || undefined);
+          return model;
+        }
+
+        // Execute all tool calls in parallel and collect result strings.
+        // The results are sent back to the model so it can continue (calling
+        // more tools or generating its final summary response).
+        const toolResultPairs = await Promise.all(
+          toolCallEntries.map(async (tc) => {
+            let args: Record<string, unknown> = {};
+            try {
+              args = JSON.parse(tc.arguments) as Record<string, unknown>;
+            } catch {
+              /* use empty args */
+            }
+            const result = await Promise.resolve(
+              callbacks.onToolCall(tc.name, args),
+            );
+            return { tc, result };
+          }),
+        );
+
+        // Append the assistant's tool-call turn and the tool results to the
+        // conversation, then loop for the model's follow-up response.
+        currentMessages = [
+          ...currentMessages,
+          {
+            role: "assistant" as const,
+            content: roundText || null,
+            tool_calls: toolCallEntries.map((tc) => ({
+              id: tc.id || `call_${tc.name}_${round}`,
+              type: "function" as const,
+              function: { name: tc.name, arguments: tc.arguments },
+            })),
+          },
+          ...toolResultPairs.map(({ tc, result }) => ({
+            role: "tool" as const,
+            content: result,
+            tool_call_id: tc.id || `call_${tc.name}_${round}`,
+          })),
+        ];
+      }
+
+      if (modelFailed) continue;
+
+      // Exhausted max rounds — return accumulated text
+      callbacks.onDone(accumText, accumReasoning || undefined);
       return model;
     } catch {
       if (signal?.aborted) {
@@ -663,24 +733,27 @@ async function nonStreamingFallback(
   signal?: AbortSignal,
   thinkingEnabled?: boolean,
 ): Promise<string | null> {
-  const body: Record<string, unknown> = {
-    model,
-    messages,
-    tools: LUNA_TOOLS,
+  const buildBody = (msgs: unknown[]) => {
+    const body: Record<string, unknown> = {
+      model,
+      messages: msgs,
+      tools: LUNA_TOOLS,
+    };
+    if (thinkingEnabled) {
+      body.thinking = { type: "enabled" };
+      body.max_tokens = 8192;
+    } else {
+      body.temperature = 0.5;
+      body.max_tokens = 1024;
+    }
+    return body;
   };
 
-  if (thinkingEnabled) {
-    body.thinking = { type: "enabled" };
-    body.max_tokens = 8192;
-  } else {
-    body.temperature = 0.5;
-    body.max_tokens = 1024;
-  }
-
+  // Round 1
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers,
-    body: JSON.stringify(body),
+    body: JSON.stringify(buildBody(messages)),
     signal,
   });
 
@@ -695,7 +768,10 @@ async function nonStreamingFallback(
       message?: {
         content?: string;
         reasoning_content?: string;
-        tool_calls?: { function: { name: string; arguments: string } }[];
+        tool_calls?: {
+          id?: string;
+          function: { name: string; arguments: string };
+        }[];
       };
     }[];
     usage?: {
@@ -704,38 +780,83 @@ async function nonStreamingFallback(
     };
   };
 
+  if (data.usage) {
+    const hit = data.usage.prompt_cache_hit_tokens ?? 0;
+    const miss = data.usage.prompt_cache_miss_tokens ?? 0;
+    if (hit > 0 || miss > 0)
+      callbacks.onCacheInfo?.({ cacheHitTokens: hit, cacheMissTokens: miss });
+  }
+
   const msg = data.choices?.[0]?.message;
-  if (msg?.tool_calls) {
-    const toolCallPromises: Promise<void>[] = [];
-    for (const tc of msg.tool_calls) {
+
+  if (!msg?.tool_calls?.length) {
+    // No tool calls — return the response directly
+    const text = msg?.content?.trim() ?? "";
+    const reasoning = msg?.reasoning_content?.trim() || undefined;
+    if (reasoning) callbacks.onReasoningToken?.(reasoning);
+    if (text) callbacks.onToken(text);
+    callbacks.onDone(text, reasoning);
+    return data.model ?? model;
+  }
+
+  // Execute tool calls in parallel and collect result strings
+  const toolResultPairs = await Promise.all(
+    msg.tool_calls.map(async (tc) => {
+      let args: Record<string, unknown> = {};
       try {
-        const result = callbacks.onToolCall(
-          tc.function.name,
-          JSON.parse(tc.function.arguments) as Record<string, unknown>,
-        );
-        if (result) toolCallPromises.push(result);
+        args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
       } catch {
-        const result = callbacks.onToolCall(tc.function.name, {});
-        if (result) toolCallPromises.push(result);
+        /* ignore */
       }
-    }
-    await Promise.all(toolCallPromises);
+      const result = await Promise.resolve(
+        callbacks.onToolCall(tc.function.name, args),
+      );
+      return { tc, result };
+    }),
+  );
+
+  // Round 2: send tool results back to model for its follow-up response
+  const followUpMessages = [
+    ...messages,
+    {
+      role: "assistant",
+      content: msg.content ?? null,
+      tool_calls: msg.tool_calls.map((tc) => ({
+        id: tc.id ?? `call_${tc.function.name}`,
+        type: "function",
+        function: { name: tc.function.name, arguments: tc.function.arguments },
+      })),
+    },
+    ...toolResultPairs.map(({ tc, result }) => ({
+      role: "tool",
+      content: result,
+      tool_call_id: tc.id ?? `call_${tc.function.name}`,
+    })),
+  ];
+
+  const res2 = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(buildBody(followUpMessages)),
+    signal,
+  });
+
+  if (!res2.ok) {
+    // Couldn't get follow-up — just call onDone with empty text
+    callbacks.onDone("", undefined);
+    return data.model ?? model;
   }
 
-  if (
-    data.usage &&
-    (data.usage.prompt_cache_hit_tokens || data.usage.prompt_cache_miss_tokens)
-  ) {
-    callbacks.onCacheInfo?.({
-      cacheHitTokens: data.usage.prompt_cache_hit_tokens ?? 0,
-      cacheMissTokens: data.usage.prompt_cache_miss_tokens ?? 0,
-    });
-  }
+  const data2 = (await res2.json()) as {
+    model?: string;
+    choices?: { message?: { content?: string; reasoning_content?: string } }[];
+  };
 
-  const text = msg?.content?.trim() ?? "";
-  const reasoning = msg?.reasoning_content?.trim() || undefined;
-  if (reasoning) callbacks.onReasoningToken?.(reasoning);
-  if (text) callbacks.onToken(text);
-  callbacks.onDone(text, reasoning);
-  return data.model ?? model;
+  const msg2 = data2.choices?.[0]?.message;
+  const text2 = msg2?.content?.trim() ?? "";
+  const reasoning2 = msg2?.reasoning_content?.trim() || undefined;
+  if (reasoning2) callbacks.onReasoningToken?.(reasoning2);
+  if (text2) callbacks.onToken(text2);
+  callbacks.onDone(text2, reasoning2);
+  return data2.model ?? data.model ?? model;
 }

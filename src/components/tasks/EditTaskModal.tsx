@@ -350,7 +350,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
                       }}
                       onDragEnd={handleDragEnd}
                       className={[
-                        "flex items-center gap-2 px-3 py-2 border rounded-lg group select-none transition-all duration-150",
+                        "flex items-start gap-2 px-3 py-2 border rounded-lg group select-none transition-all duration-150",
                         isDragging
                           ? "opacity-40 scale-[0.97] bg-white/2 border-white/5 cursor-grabbing"
                           : "bg-white/4 border-white/7 cursor-default",
@@ -405,7 +405,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
                       </div>
 
                       <span
-                        className={`flex-1 text-sm truncate transition-all duration-200 ${
+                        className={`flex-1 min-w-0 text-sm break-words transition-all duration-200 ${
                           st.completed
                             ? "line-through text-white/25"
                             : "text-white/70"

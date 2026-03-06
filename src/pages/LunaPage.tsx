@@ -248,6 +248,9 @@ export function LunaPage() {
               });
               if (ok) toast.success(`Task created: ${title}`);
               else toast.error("Failed to create task");
+              return ok
+                ? `Task created successfully: "${title}"`
+                : "Failed to create task";
             }
 
             if (name === "create_note") {
@@ -265,7 +268,12 @@ export function LunaPage() {
               });
               if (ok) toast.success(`Note created: ${title}`);
               else toast.error("Failed to create note");
+              return ok
+                ? `Note created successfully: "${title}"`
+                : "Failed to create note";
             }
+
+            return "Unknown tool";
           },
           onDone: (fullText, reasoning) => {
             setMessages((prev) =>

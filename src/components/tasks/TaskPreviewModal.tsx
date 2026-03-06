@@ -348,7 +348,7 @@ export function TaskPreviewModal({
                       <div
                         key={st.id}
                         className={[
-                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 group/sub",
+                          "w-full flex items-start gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 group/sub",
                           isCompleting ? "animate-row-complete" : "",
                           st.completed
                             ? "hover:bg-white/2.5"
@@ -367,7 +367,7 @@ export function TaskPreviewModal({
                               ? `Mark "${st.title}" as incomplete`
                               : `Mark "${st.title}" as complete`
                           }
-                          className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+                          className="flex items-start gap-2.5 flex-1 min-w-0 text-left"
                         >
                           <span
                             className={[
@@ -387,7 +387,7 @@ export function TaskPreviewModal({
                             )}
                           </span>
                           <span
-                            className={`text-sm flex-1 truncate transition-colors duration-200 ${
+                            className={`text-sm flex-1 min-w-0 break-words transition-colors duration-200 ${
                               st.completed
                                 ? "line-through text-white/30"
                                 : "text-white/70 group-hover/sub:text-white/85"
