@@ -8,30 +8,46 @@ import { ArchivePage } from "./pages/ArchivePage";
 import { NotesPage } from "./pages/NotesPage";
 import { LunaPage } from "./pages/LunaPage";
 import { Spinner } from "./components/ui/Spinner";
+import { RouteMetadata } from "./components/seo/RouteMetadata";
 
 function AppContent() {
   const { user, loading } = useAuth();
 
+  const authState = loading ? "loading" : user ? "authenticated" : "anonymous";
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-orbit-950">
-        <Spinner size={28} className="text-white/20" />
-      </div>
+      <>
+        <RouteMetadata authState={authState} />
+        <div className="min-h-screen flex items-center justify-center bg-orbit-950">
+          <Spinner size={28} className="text-white/20" />
+        </div>
+      </>
     );
   }
 
-  if (!user) return <AuthPage />;
+  if (!user) {
+    return (
+      <>
+        <RouteMetadata authState={authState} />
+        <AuthPage />
+      </>
+    );
+  }
 
   return (
-    <Routes>
-      <Route element={<AppLayout />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="notes" element={<NotesPage />} />
-        <Route path="luna" element={<LunaPage />} />
-        <Route path="archive" element={<ArchivePage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+    <>
+      <RouteMetadata authState={authState} />
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="notes" element={<NotesPage />} />
+          <Route path="luna" element={<LunaPage />} />
+          <Route path="archive" element={<ArchivePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </>
   );
 }
 
