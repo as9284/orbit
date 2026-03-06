@@ -362,7 +362,7 @@ const LUNA_TOOLS: LunaTool[] = [
     function: {
       name: "create_task",
       description:
-        "Create a new task for the user. Use when the user asks to create, add, or schedule a task.",
+        "Create a new task for the user. Use when the user asks to create, add, or schedule a task. Call this multiple times when the user requests multiple tasks or combined task-plus-note workflows.",
       parameters: {
         type: "object",
         properties: {
@@ -398,7 +398,7 @@ const LUNA_TOOLS: LunaTool[] = [
     function: {
       name: "create_note",
       description:
-        "Create a new note for the user. Use when the user asks to write down, save, remember, or jot something.",
+        "Create a new note for the user. Use when the user asks to write down, save, remember, or jot something. Call this multiple times when the user requests multiple notes or a note alongside another action.",
       parameters: {
         type: "object",
         properties: {
@@ -448,6 +448,9 @@ export function buildLunaSystemPrompt(context: {
     "- Be concise but thorough. Use markdown formatting (bold, lists, headers) when it helps readability.",
     "- When creating tasks, write clear action-oriented titles starting with verbs. Set appropriate priorities and due dates when context allows.",
     "- When creating notes, use markdown formatting for the content body.",
+    "- If the user asks for multiple deliverables or actions in one message, complete all of them in the same turn before giving your final reply.",
+    "- Use tools as many times as needed. Do not stop after the first tool call if the user asked for additional tasks, notes, or other creations.",
+    "- Before your final reply, verify that every explicit create, add, save, or schedule request from the latest user message has been handled.",
     "- After using a tool, briefly confirm what was created.",
     "- If the user's request is ambiguous, ask a clarifying question rather than guessing.",
     "- Be warm and encouraging but not overly verbose.",
@@ -733,7 +736,20 @@ async function nonStreamingFallback(
   signal?: AbortSignal,
   thinkingEnabled?: boolean,
 ): Promise<string | null> {
-  const buildBody = (msgs: unknown[]) => {
+  type ApiMessage =
+    | { role: "system" | "user"; content: string }
+    | {
+        role: "assistant";
+        content: string | null;
+        tool_calls?: {
+          id: string;
+          type: "function";
+          function: { name: string; arguments: string };
+        }[];
+      }
+    | { role: "tool"; content: string; tool_call_id: string };
+
+  const buildBody = (msgs: ApiMessage[]) => {
     const body: Record<string, unknown> = {
       model,
       messages: msgs,
@@ -749,114 +765,115 @@ async function nonStreamingFallback(
     return body;
   };
 
-  // Round 1
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(buildBody(messages)),
-    signal,
-  });
+  let currentMessages: ApiMessage[] = messages.map((message) => ({
+    role: message.role,
+    content: message.content,
+  }));
+  let accumText = "";
+  let accumReasoning = "";
 
-  if (!res.ok) {
-    callbacks.onError(`${model} failed (${res.status}).`);
-    return null;
-  }
+  for (let round = 0; round < 5; round++) {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(buildBody(currentMessages)),
+      signal,
+    });
 
-  const data = (await res.json()) as {
-    model?: string;
-    choices?: {
-      message?: {
-        content?: string;
-        reasoning_content?: string;
-        tool_calls?: {
-          id?: string;
-          function: { name: string; arguments: string };
-        }[];
-      };
-    }[];
-    usage?: {
-      prompt_cache_hit_tokens?: number;
-      prompt_cache_miss_tokens?: number;
-    };
-  };
-
-  if (data.usage) {
-    const hit = data.usage.prompt_cache_hit_tokens ?? 0;
-    const miss = data.usage.prompt_cache_miss_tokens ?? 0;
-    if (hit > 0 || miss > 0)
-      callbacks.onCacheInfo?.({ cacheHitTokens: hit, cacheMissTokens: miss });
-  }
-
-  const msg = data.choices?.[0]?.message;
-
-  if (!msg?.tool_calls?.length) {
-    // No tool calls — return the response directly
-    const text = msg?.content?.trim() ?? "";
-    const reasoning = msg?.reasoning_content?.trim() || undefined;
-    if (reasoning) callbacks.onReasoningToken?.(reasoning);
-    if (text) callbacks.onToken(text);
-    callbacks.onDone(text, reasoning);
-    return data.model ?? model;
-  }
-
-  // Execute tool calls in parallel and collect result strings
-  const toolResultPairs = await Promise.all(
-    msg.tool_calls.map(async (tc) => {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
-      } catch {
-        /* ignore */
+    if (!res.ok) {
+      if (accumText || accumReasoning) {
+        callbacks.onDone(accumText, accumReasoning || undefined);
+        return model;
       }
-      const result = await Promise.resolve(
-        callbacks.onToolCall(tc.function.name, args),
-      );
-      return { tc, result };
-    }),
-  );
+      callbacks.onError(`${model} failed (${res.status}).`);
+      return null;
+    }
 
-  // Round 2: send tool results back to model for its follow-up response
-  const followUpMessages = [
-    ...messages,
-    {
-      role: "assistant",
-      content: msg.content ?? null,
-      tool_calls: msg.tool_calls.map((tc) => ({
-        id: tc.id ?? `call_${tc.function.name}`,
-        type: "function",
-        function: { name: tc.function.name, arguments: tc.function.arguments },
+    const data = (await res.json()) as {
+      model?: string;
+      choices?: {
+        message?: {
+          content?: string;
+          reasoning_content?: string;
+          tool_calls?: {
+            id?: string;
+            function: { name: string; arguments: string };
+          }[];
+        };
+      }[];
+      usage?: {
+        prompt_cache_hit_tokens?: number;
+        prompt_cache_miss_tokens?: number;
+      };
+    };
+
+    if (data.usage) {
+      const hit = data.usage.prompt_cache_hit_tokens ?? 0;
+      const miss = data.usage.prompt_cache_miss_tokens ?? 0;
+      if (hit > 0 || miss > 0) {
+        callbacks.onCacheInfo?.({
+          cacheHitTokens: hit,
+          cacheMissTokens: miss,
+        });
+      }
+    }
+
+    const msg = data.choices?.[0]?.message;
+    const roundText = msg?.content?.trim() ?? "";
+    const roundReasoning = msg?.reasoning_content?.trim() ?? "";
+
+    if (roundReasoning) {
+      accumReasoning += roundReasoning;
+      callbacks.onReasoningToken?.(roundReasoning);
+    }
+
+    if (roundText) {
+      accumText += roundText;
+      callbacks.onToken(roundText);
+    }
+
+    if (!msg?.tool_calls?.length) {
+      callbacks.onDone(accumText, accumReasoning || undefined);
+      return data.model ?? model;
+    }
+
+    const toolResultPairs = await Promise.all(
+      msg.tool_calls.map(async (tc) => {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+        } catch {
+          /* ignore */
+        }
+        const result = await Promise.resolve(
+          callbacks.onToolCall(tc.function.name, args),
+        );
+        return { tc, result };
+      }),
+    );
+
+    currentMessages = [
+      ...currentMessages,
+      {
+        role: "assistant" as const,
+        content: msg.content ?? null,
+        tool_calls: msg.tool_calls.map((tc) => ({
+          id: tc.id ?? `call_${tc.function.name}_${round}`,
+          type: "function" as const,
+          function: {
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          },
+        })),
+      },
+      ...toolResultPairs.map(({ tc, result }) => ({
+        role: "tool" as const,
+        content: result,
+        tool_call_id: tc.id ?? `call_${tc.function.name}_${round}`,
       })),
-    },
-    ...toolResultPairs.map(({ tc, result }) => ({
-      role: "tool",
-      content: result,
-      tool_call_id: tc.id ?? `call_${tc.function.name}`,
-    })),
-  ];
-
-  const res2 = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(buildBody(followUpMessages)),
-    signal,
-  });
-
-  if (!res2.ok) {
-    // Couldn't get follow-up — just call onDone with empty text
-    callbacks.onDone("", undefined);
-    return data.model ?? model;
+    ];
   }
 
-  const data2 = (await res2.json()) as {
-    model?: string;
-    choices?: { message?: { content?: string; reasoning_content?: string } }[];
-  };
-
-  const msg2 = data2.choices?.[0]?.message;
-  const text2 = msg2?.content?.trim() ?? "";
-  const reasoning2 = msg2?.reasoning_content?.trim() || undefined;
-  if (reasoning2) callbacks.onReasoningToken?.(reasoning2);
-  if (text2) callbacks.onToken(text2);
-  callbacks.onDone(text2, reasoning2);
-  return data2.model ?? data.model ?? model;
+  callbacks.onDone(accumText, accumReasoning || undefined);
+  return model;
 }
