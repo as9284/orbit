@@ -20,6 +20,7 @@ interface Props {
   fetchSubTasks: (taskId: string) => Promise<SubTask[]>;
   fetchSubTaskCount: (taskId: string) => Promise<number>;
   onToggleSubTask: (subTaskId: string, completed: boolean) => Promise<boolean>;
+  onUpdateSubTask: (subTaskId: string, title: string) => Promise<boolean>;
 }
 
 const PRIORITY_CONFIG = {
@@ -63,6 +64,7 @@ export function TaskPreviewModal({
   fetchSubTasks,
   fetchSubTaskCount,
   onToggleSubTask,
+  onUpdateSubTask,
 }: Props) {
   // Keep a snapshot of the last non-null task so content stays visible
   // during the Modal's exit animation (when task becomes null).
@@ -77,6 +79,9 @@ export function TaskPreviewModal({
   const completingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
+  const [editingSubTaskId, setEditingSubTaskId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const editCancelledRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +96,9 @@ export function TaskPreviewModal({
       setSubTasks([]);
       setSubTaskCount(0);
       setCompletingIds(new Set());
+      setEditingSubTaskId(null);
+      setEditingTitle("");
+      editCancelledRef.current = true;
 
       fetchTimer = setTimeout(() => {
         if (cancelled) return;
@@ -108,6 +116,8 @@ export function TaskPreviewModal({
       setSubTasks([]);
       setSubTaskCount(0);
       setSubTasksLoading(false);
+      setEditingSubTaskId(null);
+      setEditingTitle("");
     }
 
     return () => {
@@ -154,6 +164,38 @@ export function TaskPreviewModal({
         next.delete(st.id);
         return next;
       });
+    }
+  };
+
+  const startEditing = (st: SubTask) => {
+    editCancelledRef.current = false;
+    setEditingSubTaskId(st.id);
+    setEditingTitle(st.title);
+  };
+
+  const cancelEditing = () => {
+    editCancelledRef.current = true;
+    setEditingSubTaskId(null);
+    setEditingTitle("");
+  };
+
+  const commitEdit = async () => {
+    if (editCancelledRef.current) {
+      editCancelledRef.current = false;
+      return;
+    }
+    const id = editingSubTaskId;
+    const trimmed = editingTitle.trim();
+    setEditingSubTaskId(null);
+    setEditingTitle("");
+    if (!id || !trimmed) return;
+    const original = subTasks.find((s) => s.id === id);
+    if (original?.title === trimmed) return;
+    const ok = await onUpdateSubTask(id, trimmed);
+    if (ok) {
+      setSubTasks((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, title: trimmed } : s)),
+      );
     }
   };
 
@@ -269,20 +311,39 @@ export function TaskPreviewModal({
                 <div className="space-y-0.5">
                   {subTasks.map((st) => {
                     const isCompleting = completingIds.has(st.id);
-                    return (
-                      <button
+                    const isEditing = editingSubTaskId === st.id;
+                    return isEditing ? (
+                      <div
                         key={st.id}
-                        type="button"
-                        onClick={() => handleToggleSub(st)}
-                        role="checkbox"
-                        aria-checked={st.completed}
-                        aria-label={
-                          st.completed
-                            ? `Mark "${st.title}" as incomplete`
-                            : `Mark "${st.title}" as complete`
-                        }
+                        className="flex items-center gap-2.5 px-3 py-2"
+                      >
+                        <span className="shrink-0 text-white/20">
+                          {st.completed ? (
+                            <CheckCircle2 size={15} />
+                          ) : (
+                            <Circle size={15} />
+                          )}
+                        </span>
+                        <input
+                          autoFocus
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void commitEdit();
+                            }
+                            if (e.key === "Escape") cancelEditing();
+                          }}
+                          onBlur={() => void commitEdit()}
+                          className="flex-1 bg-transparent text-sm text-white/80 border-b border-white/15 focus:border-violet-400/60 focus:outline-none transition-colors"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        key={st.id}
                         className={[
-                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 group/sub relative",
+                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 group/sub",
                           isCompleting ? "animate-row-complete" : "",
                           st.completed
                             ? "hover:bg-white/2.5"
@@ -291,35 +352,47 @@ export function TaskPreviewModal({
                           .filter(Boolean)
                           .join(" ")}
                       >
-                        <span
-                          className={[
-                            "shrink-0 transition-all duration-150",
-                            isCompleting ? "animate-check-pop" : "",
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSub(st)}
+                          role="checkbox"
+                          aria-checked={st.completed}
+                          aria-label={
                             st.completed
-                              ? "text-emerald-400/60"
-                              : "text-white/20 group-hover/sub:text-emerald-400/55",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
+                              ? `Mark "${st.title}" as incomplete`
+                              : `Mark "${st.title}" as complete`
+                          }
+                          className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
                         >
-                          {st.completed ? (
-                            <CheckCircle2 size={15} />
-                          ) : (
-                            <Circle size={15} />
-                          )}
-                        </span>
+                          <span
+                            className={[
+                              "shrink-0 transition-all duration-150",
+                              isCompleting ? "animate-check-pop" : "",
+                              st.completed
+                                ? "text-emerald-400/60"
+                                : "text-white/20 group-hover/sub:text-emerald-400/55",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          >
+                            {st.completed ? (
+                              <CheckCircle2 size={15} />
+                            ) : (
+                              <Circle size={15} />
+                            )}
+                          </span>
+                          <span
+                            className={`text-sm flex-1 truncate transition-colors duration-200 ${
+                              st.completed
+                                ? "line-through text-white/30"
+                                : "text-white/70 group-hover/sub:text-white/85"
+                            }`}
+                          >
+                            {st.title}
+                          </span>
+                        </button>
                         <span
-                          className={`text-sm flex-1 transition-colors duration-200 ${
-                            st.completed
-                              ? "line-through text-white/30"
-                              : "text-white/70 group-hover/sub:text-white/85"
-                          }`}
-                        >
-                          {st.title}
-                        </span>
-                        {/* Inline hover action hint */}
-                        <span
-                          className={`text-[10px] font-medium shrink-0 ml-1 opacity-0 group-hover/sub:opacity-100 transition-all duration-150 ${
+                          className={`text-[10px] font-medium shrink-0 opacity-0 group-hover/sub:opacity-100 transition-all duration-150 ${
                             st.completed
                               ? "text-white/25"
                               : "text-emerald-400/60"
@@ -328,7 +401,15 @@ export function TaskPreviewModal({
                         >
                           {st.completed ? "Undo" : "Complete"}
                         </span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => startEditing(st)}
+                          aria-label={`Edit "${st.title}"`}
+                          className="shrink-0 opacity-0 group-hover/sub:opacity-100 p-0.5 text-white/25 hover:text-white/60 transition-all duration-150"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>

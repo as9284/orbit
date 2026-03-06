@@ -301,6 +301,23 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
     return true;
   };
 
+  const updateSubTaskTitle = async (
+    subTaskId: string,
+    title: string,
+  ): Promise<boolean> => {
+    if (!encryptionKey) return false;
+    const encTitle = await encrypt(title.trim(), encryptionKey);
+    const { error } = await supabase
+      .from("sub_tasks")
+      .update({ title: encTitle })
+      .eq("id", subTaskId);
+    if (error) {
+      setError(error.message);
+      return false;
+    }
+    return true;
+  };
+
   return {
     activeTasks,
     archivedTasks,
@@ -319,6 +336,7 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
     fetchSubTaskCount,
     saveSubTasks,
     toggleSubTaskComplete,
+    updateSubTaskTitle,
   };
 }
 

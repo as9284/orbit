@@ -54,10 +54,23 @@ export function DashboardPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [previewTask, setPreviewTask] = useState<Task | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
-  const [sort, setSort] = useState<Sort>("recent");
+  const [filter, setFilter] = useState<Filter>(() => {
+    const saved = localStorage.getItem("orbit:dashboard:filter");
+    return (saved as Filter) || "all";
+  });
+  const [sort, setSort] = useState<Sort>(() => {
+    const saved = localStorage.getItem("orbit:dashboard:sort");
+    return (saved as Sort) || "recent";
+  });
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem("orbit:dashboard:filter", filter);
+  }, [filter]);
+  useEffect(() => {
+    localStorage.setItem("orbit:dashboard:sort", sort);
+  }, [sort]);
 
   // Re-fetch whenever the encryption key becomes available (covers the
   // fresh-sign-in case where the key isn't ready on initial mount).
@@ -385,6 +398,7 @@ export function DashboardPage() {
         fetchSubTasks={api.fetchSubTasks}
         fetchSubTaskCount={api.fetchSubTaskCount}
         onToggleSubTask={api.toggleSubTaskComplete}
+        onUpdateSubTask={api.updateSubTaskTitle}
       />
     </div>
   );
