@@ -158,6 +158,29 @@ function parseTaskDraft(text: string): AiTaskDraft | null {
   }
 }
 
+function cleanSubTaskCandidate(value: string): string {
+  return value
+    .trim()
+    .replace(/^[-*•\s]+/, "")
+    .replace(/^\d+[.)]\s*/, "")
+    .replace(/^\[[ xX]\]\s*/, "")
+    .replace(/[;:,.!?]+$/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function inferSubTasksFromNote(content: string | null | undefined): string[] {
+  if (!content) return [];
+
+  const candidates = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^([-*•]|\d+[.)]|\[[ xX]\])\s+/.test(line))
+    .map(cleanSubTaskCandidate)
+    .filter((line) => line.length >= 3 && line.length <= 90);
+
+  return [...new Set(candidates)].slice(0, 4);
+}
+
 /**
  * Ask OpenRouter to categorise a single task.
  * Returns a Title-Case label (1-3 words) or null on any failure.
@@ -224,11 +247,11 @@ export async function convertNoteToTaskDraft(
     "- medium: clearly important but not immediately blocking",
     "- low: nice-to-have, no time pressure",
     "",
-    "SUB-TASKS — only create a sub-task when ALL four conditions are true:",
-    "  1. It is a discrete physical action the user must perform",
-    "  2. It is meaningfully distinct from the other sub-tasks (not implied by them)",
-    "  3. It belongs to this single task, not a separate concern",
-    "  4. A user would want to tick it off independently",
+    "SUB-TASKS",
+    "- Create subTasks whenever the note contains multiple concrete actions, a checklist, bullets, numbered steps, or errands that should be checked off separately",
+    "- A good sub-task is a short action the user can complete independently",
+    "- If the note includes 2-4 explicit action points, preserve them as subTasks instead of collapsing them into the description",
+    "- Prefer 1-3 subTasks when the note clearly implies a short sequence or checklist",
     "What belongs in the DESCRIPTION instead of a sub-task:",
     "  - Background context, motivation, or 'why'",
     "  - Reference material, links, or notes for later",
@@ -239,6 +262,10 @@ export async function convertNoteToTaskDraft(
     "  1–2 sub-tasks: note describes a short sequence with clearly distinct steps",
     "  3–4 sub-tasks: note outlines a concrete multi-step process (rare)",
     "Never split a continuous action into artificial micro-steps to fill the list.",
+    "Examples:",
+    '  - "Need to renew passport before June, gather photo, fill form, book appointment" -> title + 2-3 subTasks; deadline context stays in description',
+    '  - "Prepare tax return, use the 2025 income folder, check deductible expenses, submit online" -> title + subTasks for checking expenses and submitting; folder detail stays in description',
+    '  - "Remember to ask about vacation policy" -> one task, no subTasks',
     "",
     `Note title: ${title}`,
     `Note content: ${content || "none"}`,
@@ -256,6 +283,13 @@ export async function convertNoteToTaskDraft(
       model: result.model,
       error: `AI returned invalid task JSON: ${result.text.slice(0, 180)}`,
     };
+  }
+
+  if (draft.subTasks.length === 0) {
+    const inferredSubTasks = inferSubTasksFromNote(content);
+    if (inferredSubTasks.length > 0) {
+      draft.subTasks = inferredSubTasks;
+    }
   }
 
   return { draft, model: result.model, error: null };
