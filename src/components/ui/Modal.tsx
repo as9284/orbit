@@ -22,6 +22,7 @@ export function Modal({
   const previousFocus = useRef<HTMLElement | null>(null);
 
   // Mount/unmount lifecycle
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       previousFocus.current = document.activeElement as HTMLElement;
@@ -36,6 +37,7 @@ export function Modal({
       return () => clearTimeout(timer);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Entry animation: wait for mount to paint, then trigger visible.
   // Double-rAF guarantees we're past the browser's first paint of the

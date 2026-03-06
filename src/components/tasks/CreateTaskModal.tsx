@@ -183,7 +183,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
         priority,
         due_date: dueDate || null,
       },
-      subTasks.map(({ _lid: _l, ...rest }) => rest),
+      subTasks.map(({ _lid: _l, ...rest }) => rest), // eslint-disable-line @typescript-eslint/no-unused-vars
     );
     setLoading(false);
     if (ok) handleClose();

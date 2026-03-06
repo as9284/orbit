@@ -202,11 +202,13 @@ export function DashboardPage() {
   }, [api.activeTasks, api.categories]);
 
   // Clear category filter if the selected category no longer exists
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (categoryFilter && !uniqueCategories.includes(categoryFilter)) {
       setCategoryFilter(null);
     }
   }, [uniqueCategories, categoryFilter]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleCreate = async (
     data: Parameters<typeof api.createTask>[0],

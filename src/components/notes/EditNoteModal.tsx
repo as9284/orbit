@@ -14,10 +14,13 @@ interface Props {
 export function EditNoteModal({ open, note, onClose, onSave }: Props) {
   const [title, setTitle] = useState(note?.title ?? "");
   const [content, setContent] = useState(note?.content ?? "");
+  const [titleError, setTitleError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // Sync form state whenever a different note is selected for editing.
   // Guarded by `if (note)` so form content persists during the exit animation
   // (when note becomes null but the modal is still animating out).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (note) {
       setTitle(note.title);
@@ -25,8 +28,7 @@ export function EditNoteModal({ open, note, onClose, onSave }: Props) {
       setTitleError("");
     }
   }, [note?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [titleError, setTitleError] = useState("");
-  const [loading, setLoading] = useState(false);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

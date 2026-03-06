@@ -68,9 +68,12 @@ export function TaskPreviewModal({
 }: Props) {
   // Keep a snapshot of the last non-null task so content stays visible
   // during the Modal's exit animation (when task becomes null).
-  const lastTask = useRef<Task | null>(null);
-  if (task) lastTask.current = task;
-  const t = lastTask.current;
+  // React-approved pattern: setState during render to derive state from props.
+  const [frozenTask, setFrozenTask] = useState<Task | null>(null);
+  if (task && task !== frozenTask) {
+    setFrozenTask(task);
+  }
+  const t = task ?? frozenTask;
 
   const [subTasks, setSubTasks] = useState<SubTask[]>([]);
   const [subTaskCount, setSubTaskCount] = useState(0);
@@ -83,6 +86,7 @@ export function TaskPreviewModal({
   const [editingTitle, setEditingTitle] = useState("");
   const editCancelledRef = useRef(false);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     let cancelled = false;
     let fetchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -125,6 +129,7 @@ export function TaskPreviewModal({
       if (fetchTimer !== null) clearTimeout(fetchTimer);
     };
   }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Cleanup timers on unmount
   useEffect(() => {

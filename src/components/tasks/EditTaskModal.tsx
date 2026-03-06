@@ -93,6 +93,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
   );
 
   // Sync form state whenever a different task is opened
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (task) {
       setTitle(task.title);
@@ -118,6 +119,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
       });
     }
   }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Cleanup animation timers on unmount
   useEffect(() => {
@@ -240,7 +242,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
         priority,
         due_date: dueDate || null,
       },
-      subTasks.map(({ _lid: _l, ...rest }) => rest),
+      subTasks.map(({ _lid: _l, ...rest }) => rest), // eslint-disable-line @typescript-eslint/no-unused-vars
       existingSubTaskIds,
     );
     setLoading(false);

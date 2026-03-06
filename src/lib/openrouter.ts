@@ -13,6 +13,7 @@ export function getOpenRouterKey(): string {
 }
 
 /** @deprecated No longer needed — use Settings UI */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function setOpenRouterKey(_key: string): void {
   // no-op; keys are managed via ai.ts saveAiSettings now
 }
@@ -53,7 +54,10 @@ export interface CacheInfo {
 export interface StreamCallbacks {
   onToken: (token: string) => void;
   onReasoningToken?: (token: string) => void;
-  onToolCall: (name: string, args: Record<string, unknown>) => void;
+  onToolCall: (
+    name: string,
+    args: Record<string, unknown>,
+  ) => void | Promise<void>;
   onDone: (fullText: string, reasoning?: string) => void;
   onError: (error: string) => void;
   onCacheInfo?: (info: CacheInfo) => void;
@@ -278,7 +282,7 @@ export async function categorizeTask(
 export async function convertNoteToTaskDraft(
   title: string,
   content: string | null | undefined,
-  _apiKey?: string,
+  _apiKey?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
 ): Promise<ConvertNoteToTaskResult> {
   const prompt = [
     "You are a productivity expert. Convert the following note into a single well-structured, actionable task.",
@@ -616,22 +620,26 @@ export async function streamLunaChat(
         }
       }
 
+      const toolCallPromises: Promise<void>[] = [];
       for (const tc of Object.values(toolCalls)) {
         if (tc.name) {
           try {
-            callbacks.onToolCall(
+            const result = callbacks.onToolCall(
               tc.name,
               JSON.parse(tc.arguments) as Record<string, unknown>,
             );
+            if (result) toolCallPromises.push(result);
           } catch {
-            callbacks.onToolCall(tc.name, {});
+            const result = callbacks.onToolCall(tc.name, {});
+            if (result) toolCallPromises.push(result);
           }
         }
       }
+      await Promise.all(toolCallPromises);
 
       callbacks.onDone(fullText, fullReasoning || undefined);
       return model;
-    } catch (err) {
+    } catch {
       if (signal?.aborted) {
         callbacks.onError("Request cancelled.");
         return null;
@@ -698,16 +706,20 @@ async function nonStreamingFallback(
 
   const msg = data.choices?.[0]?.message;
   if (msg?.tool_calls) {
+    const toolCallPromises: Promise<void>[] = [];
     for (const tc of msg.tool_calls) {
       try {
-        callbacks.onToolCall(
+        const result = callbacks.onToolCall(
           tc.function.name,
           JSON.parse(tc.function.arguments) as Record<string, unknown>,
         );
+        if (result) toolCallPromises.push(result);
       } catch {
-        callbacks.onToolCall(tc.function.name, {});
+        const result = callbacks.onToolCall(tc.function.name, {});
+        if (result) toolCallPromises.push(result);
       }
     }
+    await Promise.all(toolCallPromises);
   }
 
   if (

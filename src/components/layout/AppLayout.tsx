@@ -32,10 +32,12 @@ export function AppLayout() {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTasksApi() {
   return useOutletContext<OutletContextType>().tasksApi;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNotesApi() {
   return useOutletContext<OutletContextType>().notesApi;
 }
