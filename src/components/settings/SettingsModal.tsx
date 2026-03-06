@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   AlertCircle,
   BrainCircuit,
+  ExternalLink,
 } from "lucide-react";
 import {
   getOpenRouterKey,
@@ -638,11 +639,51 @@ function AITab() {
             )}
           </div>
         </form>
-        <p className="text-[11px] text-white/25 mt-2 leading-relaxed">
-          Get a free key at{" "}
-          <span className="text-white/40 font-medium">openrouter.ai</span>. Your
-          key is stored only in this browser.
-        </p>
+        {/* How-to guide */}
+        <div className="mt-3 rounded-xl border border-white/[0.07] bg-white/2.5 p-3.5 space-y-2.5">
+          <p className="text-[11px] font-semibold text-white/40 uppercase tracking-widest">
+            How to get a free key
+          </p>
+          <ol className="space-y-1.5">
+            {[
+              <>
+                Go to{" "}
+                <a
+                  href="https://openrouter.ai"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-400/80 hover:text-violet-300 transition-colors inline-flex items-center gap-0.5"
+                >
+                  openrouter.ai <ExternalLink size={10} />
+                </a>{" "}
+                and create a free account
+              </>,
+              <>
+                Open <span className="text-white/55 font-medium">Keys</span> in
+                the left sidebar
+              </>,
+              <>
+                Click{" "}
+                <span className="text-white/55 font-medium">Create key</span>,
+                give it any name
+              </>,
+              <>Copy the key and paste it above — no credit card required</>,
+            ].map((step, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="shrink-0 w-4 h-4 mt-0.5 flex items-center justify-center rounded-full bg-violet-500/15 text-violet-400/80 text-[9px] font-bold">
+                  {i + 1}
+                </span>
+                <span className="text-[11px] text-white/35 leading-relaxed">
+                  {step}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="text-[10px] text-white/20 leading-relaxed pt-0.5 border-t border-white/6">
+            Your key is stored only in this browser and never sent to our
+            servers. Only task titles and descriptions are sent to OpenRouter.
+          </p>
+        </div>
       </SettingsSection>
 
       {/* Model info */}

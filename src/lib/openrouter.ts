@@ -73,6 +73,7 @@ export function setOpenRouterKey(key: string): void {
 async function requestOpenRouterText(
   prompt: string,
   apiKey: string,
+  maxTokens = 300,
 ): Promise<{
   text: string | null;
   model: string | null;
@@ -93,7 +94,7 @@ async function requestOpenRouterText(
         body: JSON.stringify({
           model,
           messages: [{ role: "user", content: prompt }],
-          max_tokens: 300,
+          max_tokens: maxTokens,
           temperature: 0.2,
         }),
       });
@@ -204,24 +205,46 @@ export async function convertNoteToTaskDraft(
   apiKey: string,
 ): Promise<ConvertNoteToTaskResult> {
   const prompt = [
-    "Convert this note into exactly one primary actionable task.",
-    "Respond with valid JSON only.",
-    'Use this exact shape: {"title":"string","description":"string","priority":"low|medium|high","subTasks":["string"]}',
-    "Rules:",
-    "- Produce one task only, not a project breakdown or task list",
-    "- title: concise actionable task title, max 80 chars",
-    "- description: short cleaned summary of the next concrete outcome",
-    "- priority: choose low, medium, or high",
-    "- subTasks: 0 to 4 concrete steps only",
-    "- Prefer 0 to 2 subTasks unless the note clearly describes a short sequence that must happen",
-    "- Do not expand brainstorming, meeting notes, or reference material into many tasks",
-    "- If the note already looks like a task, preserve its intent and keep subTasks minimal",
-    "- Keep subTasks tightly scoped to the same primary task",
+    "Convert the note below into exactly one actionable task. Respond with raw JSON only — no markdown, no explanation.",
+    'Shape: {"title":"string","description":"string","priority":"low|medium|high","subTasks":["string"]}',
+    "",
+    "TITLE",
+    "- Begin with an action verb (Fix, Write, Schedule, Research, Review, Build, etc.)",
+    "- Capture the single primary goal in max 80 characters",
+    "- Never start with 'I need to' or 'I should'",
+    "",
+    "DESCRIPTION",
+    "- 1–2 sentences of context, constraints, or acceptance criteria from the note",
+    "- Captures the 'why', hard requirements, or definition of done",
+    "- Do NOT repeat the title and do NOT list steps here",
+    '- Use empty string "" when the title alone is self-contained',
+    "",
+    "PRIORITY",
+    "- high: has a near deadline, blocks something, or the note marks it urgent",
+    "- medium: clearly important but not immediately blocking",
+    "- low: nice-to-have, no time pressure",
+    "",
+    "SUB-TASKS — only create a sub-task when ALL four conditions are true:",
+    "  1. It is a discrete physical action the user must perform",
+    "  2. It is meaningfully distinct from the other sub-tasks (not implied by them)",
+    "  3. It belongs to this single task, not a separate concern",
+    "  4. A user would want to tick it off independently",
+    "What belongs in the DESCRIPTION instead of a sub-task:",
+    "  - Background context, motivation, or 'why'",
+    "  - Reference material, links, or notes for later",
+    "  - Constraints, requirements, or acceptance criteria",
+    "  - Any information the user needs but doesn't need to act on as a step",
+    "Sub-task count guide:",
+    "  0 sub-tasks: single-action note, vague idea, reminder, or reference material",
+    "  1–2 sub-tasks: note describes a short sequence with clearly distinct steps",
+    "  3–4 sub-tasks: note outlines a concrete multi-step process (rare)",
+    "Never split a continuous action into artificial micro-steps to fill the list.",
+    "",
     `Note title: ${title}`,
     `Note content: ${content || "none"}`,
   ].join("\n");
 
-  const result = await requestOpenRouterText(prompt, apiKey);
+  const result = await requestOpenRouterText(prompt, apiKey, 450);
   if (!result.text) {
     return { draft: null, model: result.model, error: result.error };
   }
