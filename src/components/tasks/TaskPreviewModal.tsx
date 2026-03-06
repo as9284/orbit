@@ -18,6 +18,7 @@ interface Props {
   onClose: () => void;
   onEdit: (task: Task) => void;
   fetchSubTasks: (taskId: string) => Promise<SubTask[]>;
+  fetchSubTaskCount: (taskId: string) => Promise<number>;
   onToggleSubTask: (subTaskId: string, completed: boolean) => Promise<boolean>;
 }
 
@@ -60,6 +61,7 @@ export function TaskPreviewModal({
   onClose,
   onEdit,
   fetchSubTasks,
+  fetchSubTaskCount,
   onToggleSubTask,
 }: Props) {
   // Keep a snapshot of the last non-null task so content stays visible
@@ -69,6 +71,7 @@ export function TaskPreviewModal({
   const t = lastTask.current;
 
   const [subTasks, setSubTasks] = useState<SubTask[]>([]);
+  const [subTaskCount, setSubTaskCount] = useState(0);
   const [subTasksLoading, setSubTasksLoading] = useState(false);
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
   const completingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
@@ -76,18 +79,41 @@ export function TaskPreviewModal({
   );
 
   useEffect(() => {
+    let cancelled = false;
+    let fetchTimer: ReturnType<typeof setTimeout> | null = null;
+
     if (task) {
+      // Set loading state synchronously so React commits the skeleton render
+      // before we fire the fetches. Without setTimeout(0), React 18's automatic
+      // batching collapses setSubTasksLoading(true) with the cache-resolved
+      // .then() callbacks into a single render, bypassing the skeleton entirely.
       setSubTasksLoading(true);
       setSubTasks([]);
+      setSubTaskCount(0);
       setCompletingIds(new Set());
-      fetchSubTasks(task.id).then((data) => {
-        setSubTasks(data);
-        setSubTasksLoading(false);
-      });
+
+      fetchTimer = setTimeout(() => {
+        if (cancelled) return;
+        fetchSubTaskCount(task.id).then((count) => {
+          if (!cancelled) setSubTaskCount(count);
+        });
+        fetchSubTasks(task.id).then((data) => {
+          if (cancelled) return;
+          setSubTasks(data);
+          setSubTaskCount(data.length);
+          setSubTasksLoading(false);
+        });
+      }, 0);
     } else {
       setSubTasks([]);
+      setSubTaskCount(0);
       setSubTasksLoading(false);
     }
+
+    return () => {
+      cancelled = true;
+      if (fetchTimer !== null) clearTimeout(fetchTimer);
+    };
   }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cleanup timers on unmount
@@ -133,6 +159,17 @@ export function TaskPreviewModal({
 
   const priority = t ? PRIORITY_CONFIG[t.priority] : null;
   const due = t?.due_date ? getDueDateInfo(t.due_date, t.completed) : null;
+  // While loading, use the known count (from the quick count fetch) or fall back
+  // to 3 placeholder rows so skeletons always appear immediately.
+  const skeletonCount = subTasksLoading
+    ? subTaskCount > 0
+      ? subTaskCount
+      : 3
+    : subTaskCount;
+  const skeletonWidths = Array.from({ length: skeletonCount }, (_, index) => {
+    const widths = [58, 78, 44, 67, 52, 73];
+    return widths[index % widths.length];
+  });
 
   return (
     <Modal
@@ -215,7 +252,7 @@ export function TaskPreviewModal({
               </div>
               {subTasksLoading ? (
                 <div className="space-y-1">
-                  {([58, 78, 44] as const).map((w, i) => (
+                  {skeletonWidths.map((w, i) => (
                     <div
                       key={i}
                       className="flex items-center gap-2.5 px-3 py-2"

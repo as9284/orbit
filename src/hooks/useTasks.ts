@@ -212,6 +212,20 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
     return decryptSubTasks(data ?? [], encryptionKey);
   };
 
+  const fetchSubTaskCount = async (taskId: string): Promise<number> => {
+    const { count, error } = await supabase
+      .from("sub_tasks")
+      .select("id", { count: "exact" })
+      .eq("task_id", taskId);
+
+    if (error) {
+      setError(error.message);
+      return 0;
+    }
+
+    return count ?? 0;
+  };
+
   const saveSubTasks = async (
     taskId: string,
     subTasks: SubTaskInput[],
@@ -302,6 +316,7 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
     unarchiveTask,
     deleteForever,
     fetchSubTasks,
+    fetchSubTaskCount,
     saveSubTasks,
     toggleSubTaskComplete,
   };

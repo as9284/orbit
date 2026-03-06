@@ -383,6 +383,7 @@ export function DashboardPage() {
           setEditTask(t);
         }}
         fetchSubTasks={api.fetchSubTasks}
+        fetchSubTaskCount={api.fetchSubTaskCount}
         onToggleSubTask={api.toggleSubTaskComplete}
       />
     </div>
