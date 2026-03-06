@@ -1,17 +1,26 @@
 import { useState } from "react";
-import { FileText, Pencil } from "lucide-react";
+import { FileText, Pencil, Sparkles } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Modal } from "../ui/Modal";
+import { Spinner } from "../ui/Spinner";
 import { renderMarkdown } from "../../lib/markdown";
 import type { Note } from "../../types/database.types";
 
 interface Props {
   note: Note | null;
+  converting: boolean;
   onClose: () => void;
   onEdit: (note: Note) => void;
+  onConvert: (note: Note) => void;
 }
 
-export function NotePreviewModal({ note, onClose, onEdit }: Props) {
+export function NotePreviewModal({
+  note,
+  converting,
+  onClose,
+  onEdit,
+  onConvert,
+}: Props) {
   // Keep a snapshot so content stays visible during the exit animation
   // (when note becomes null, displayNote still holds the last note).
   const [displayNote, setDisplayNote] = useState<Note | null>(note);
@@ -63,6 +72,15 @@ export function NotePreviewModal({ note, onClose, onEdit }: Props) {
               className="flex-1 py-2.5 text-sm font-medium text-white/40 border border-white/8 rounded-xl hover:bg-white/4 hover:text-white/55 transition-all duration-200 focus-ring"
             >
               Close
+            </button>
+            <button
+              type="button"
+              disabled={converting}
+              onClick={() => onConvert(displayNote)}
+              className="flex-1 py-2.5 text-sm font-semibold border border-cyan-400/20 text-cyan-100 rounded-xl hover:bg-cyan-500/10 hover:border-cyan-300/35 transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait focus-ring"
+            >
+              {converting ? <Spinner size={13} /> : <Sparkles size={13} />}
+              AI to task
             </button>
             <button
               type="button"

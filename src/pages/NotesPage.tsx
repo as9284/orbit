@@ -1,8 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
-import { Plus, FileText, Pencil, Trash2, StickyNote } from "lucide-react";
+import {
+  Plus,
+  FileText,
+  Pencil,
+  Trash2,
+  StickyNote,
+  Sparkles,
+} from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { useNotesApi } from "../components/layout/AppLayout";
+import { useNotesApi, useTasksApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
 import { Spinner } from "../components/ui/Spinner";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
@@ -10,16 +17,20 @@ import { CreateNoteModal } from "../components/notes/CreateNoteModal";
 import { EditNoteModal } from "../components/notes/EditNoteModal";
 import { NotePreviewModal } from "../components/notes/NotePreviewModal";
 import { stripMarkdown } from "../lib/markdown";
+import { convertNoteToTaskDraft, getOpenRouterKey } from "../lib/openrouter";
 import type { Note } from "../types/database.types";
 
 export function NotesPage() {
   const api = useNotesApi();
+  const tasksApi = useTasksApi();
   const { encryptionKey } = useAuth();
   const [createOpen, setCreateOpen] = useState(false);
   const [editNote, setEditNote] = useState<Note | null>(null);
   const [previewNote, setPreviewNote] = useState<Note | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [convertingNoteId, setConvertingNoteId] = useState<string | null>(null);
+  const [postConvertNote, setPostConvertNote] = useState<Note | null>(null);
 
   useEffect(() => {
     if (encryptionKey) api.fetchNotes();
@@ -84,6 +95,77 @@ export function NotesPage() {
       setDeleteId(null);
     },
     [api],
+  );
+
+  const handleConvertToTask = useCallback(
+    async (note: Note) => {
+      const apiKey = getOpenRouterKey();
+      if (!apiKey) {
+        toast.error("Add your OpenRouter API key in Settings > AI first");
+        return;
+      }
+
+      setConvertingNoteId(note.id);
+      try {
+        const result = await convertNoteToTaskDraft(
+          note.title,
+          note.content,
+          apiKey,
+        );
+
+        if (!result.draft) {
+          toast.error(result.error || "Failed to convert note with AI");
+          return;
+        }
+
+        const taskId = await tasksApi.createTask({
+          title: result.draft.title,
+          description: result.draft.description || undefined,
+          priority: result.draft.priority,
+        });
+
+        if (!taskId) {
+          toast.error("Task creation failed after AI conversion");
+          return;
+        }
+
+        if (result.draft.subTasks.length > 0) {
+          const saved = await tasksApi.saveSubTasks(
+            taskId,
+            result.draft.subTasks.map((title) => ({ title })),
+            [],
+          );
+          if (!saved) {
+            toast.error("Task created, but sub-tasks could not be saved");
+            return;
+          }
+        }
+
+        const categoryResult = await tasksApi.categorizeSingleTask({
+          taskId,
+          title: result.draft.title,
+          description: result.draft.description,
+        });
+
+        if (categoryResult.error) {
+          toast.error(
+            `Task created, but categorization failed: ${categoryResult.error}`,
+          );
+        }
+
+        toast.success(
+          categoryResult.category
+            ? `Task created with AI in ${categoryResult.category}`
+            : result.model
+              ? `Task created with AI via ${result.model}`
+              : "Task created with AI",
+        );
+        setPostConvertNote(note);
+      } finally {
+        setConvertingNoteId(null);
+      }
+    },
+    [tasksApi],
   );
 
   return (
@@ -161,9 +243,11 @@ export function NotesPage() {
             >
               <NoteCard
                 note={note}
+                converting={convertingNoteId === note.id}
                 onEdit={setEditNote}
                 onPreview={setPreviewNote}
                 onDelete={(id) => setDeleteId(id)}
+                onConvert={handleConvertToTask}
               />
             </div>
           ))}
@@ -184,11 +268,13 @@ export function NotesPage() {
       />
       <NotePreviewModal
         note={previewNote}
+        converting={previewNote?.id === convertingNoteId}
         onClose={() => setPreviewNote(null)}
         onEdit={(n) => {
           setPreviewNote(null);
           setEditNote(n);
         }}
+        onConvert={handleConvertToTask}
       />
       <ConfirmModal
         open={!!deleteId}
@@ -198,6 +284,21 @@ export function NotesPage() {
         confirmLabel="Delete"
         onConfirm={() => deleteId && handleDelete(deleteId)}
       />
+      <ConfirmModal
+        open={!!postConvertNote}
+        onClose={() => setPostConvertNote(null)}
+        title="Delete original note?"
+        message="The task was created successfully. Delete the original note now, or keep it for reference? Note archiving is not available yet."
+        confirmLabel="Delete note"
+        onConfirm={() => {
+          if (!postConvertNote) return;
+          if (previewNote?.id === postConvertNote.id) {
+            setPreviewNote(null);
+          }
+          void handleDelete(postConvertNote.id);
+          setPostConvertNote(null);
+        }}
+      />
     </div>
   );
 }
@@ -206,14 +307,18 @@ export function NotesPage() {
 
 function NoteCard({
   note,
+  converting,
   onEdit,
   onPreview,
   onDelete,
+  onConvert,
 }: {
   note: Note;
+  converting: boolean;
   onEdit: (note: Note) => void;
   onPreview: (note: Note) => void;
   onDelete: (id: string) => void;
+  onConvert: (note: Note) => void;
 }) {
   return (
     <div
@@ -244,6 +349,17 @@ function NoteCard({
           {format(parseISO(note.updated_at), "MMM d, yyyy")}
         </span>
         <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onConvert(note);
+            }}
+            disabled={converting}
+            className="p-1.5 rounded-lg text-cyan-300/45 hover:text-cyan-200 hover:bg-cyan-500/10 transition-all disabled:opacity-60 disabled:cursor-wait"
+            aria-label="Convert note to task with AI"
+          >
+            {converting ? <Spinner size={12} /> : <Sparkles size={12} />}
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();

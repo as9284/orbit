@@ -22,9 +22,15 @@ import {
   EyeOff,
   CheckCircle2,
   AlertCircle,
+  BrainCircuit,
 } from "lucide-react";
+import {
+  getOpenRouterKey,
+  setOpenRouterKey,
+  AI_MODEL,
+} from "../../lib/openrouter";
 
-type Tab = "account" | "security" | "danger";
+type Tab = "account" | "security" | "ai" | "danger";
 
 interface Props {
   open: boolean;
@@ -36,6 +42,7 @@ export function SettingsModal({ open, onClose }: Props) {
   const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
     { id: "account", label: "Account", icon: <User size={12} /> },
     { id: "security", label: "Security", icon: <ShieldCheck size={12} /> },
+    { id: "ai", label: "AI", icon: <BrainCircuit size={12} /> },
     { id: "danger", label: "Danger zone", icon: <Trash2 size={12} /> },
   ];
 
@@ -66,6 +73,7 @@ export function SettingsModal({ open, onClose }: Props) {
 
       {tab === "account" && <AccountTab />}
       {tab === "security" && <SecurityTab />}
+      {tab === "ai" && <AITab />}
       {tab === "danger" && <DangerTab onClose={onClose} />}
     </Modal>
   );
@@ -555,6 +563,131 @@ function SecurityTab() {
   );
 }
 
+// ── AI Tab ────────────────────────────────────────────────────────────────────
+
+function AITab() {
+  const { user } = useAuth();
+  const [apiKey, setApiKeyLocal] = useState(() => getOpenRouterKey());
+  const [show, setShow] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [cleared, setCleared] = useState(false);
+
+  const handleSave = (e: FormEvent) => {
+    e.preventDefault();
+    setOpenRouterKey(apiKey);
+    setDirty(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const handleClearCategories = () => {
+    const userId = user!.id;
+    localStorage.removeItem(`orbit:categories:${userId}`);
+    window.dispatchEvent(
+      new CustomEvent("orbit:categories:cleared", { detail: { userId } }),
+    );
+    setCleared(true);
+    setTimeout(() => setCleared(false), 3000);
+  };
+
+  const hasSavedKey = !!getOpenRouterKey();
+
+  return (
+    <div className="space-y-4">
+      {/* API key field */}
+      <SettingsSection label="OpenRouter API key">
+        <form onSubmit={handleSave} className="space-y-2.5">
+          <div
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border transition-colors duration-200 ${
+              dirty
+                ? "border-violet-500/30 bg-white/5"
+                : "border-white/8 bg-white/4"
+            }`}
+          >
+            <input
+              type={show ? "text" : "password"}
+              value={apiKey}
+              placeholder="sk-or-…"
+              autoComplete="off"
+              onChange={(e) => {
+                setApiKeyLocal(e.target.value);
+                setDirty(true);
+                setSaved(false);
+              }}
+              className="flex-1 min-w-0 bg-transparent text-white/90 text-sm placeholder:text-white/25 outline-none font-mono"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShow((v) => !v)}
+              className="text-white/30 hover:text-white/60 transition-colors shrink-0"
+              aria-label={show ? "Hide key" : "Show key"}
+            >
+              {show ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <PrimaryBtn loading={false} disabled={!dirty || !apiKey.trim()}>
+              Save key
+            </PrimaryBtn>
+            {saved && (
+              <span className="flex items-center gap-1 text-[11px] text-emerald-400">
+                <CheckCircle2 size={12} /> Saved
+              </span>
+            )}
+          </div>
+        </form>
+        <p className="text-[11px] text-white/25 mt-2 leading-relaxed">
+          Get a free key at{" "}
+          <span className="text-white/40 font-medium">openrouter.ai</span>. Your
+          key is stored only in this browser.
+        </p>
+      </SettingsSection>
+
+      {/* Model info */}
+      <SettingsSection label="Model">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-white/55 font-mono">{AI_MODEL}</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
+            Free
+          </span>
+        </div>
+        <p className="text-[11px] text-white/25 mt-2 leading-relaxed">
+          Tasks are categorised automatically in the background when an API key
+          is present. Only titles and descriptions are sent.
+        </p>
+      </SettingsSection>
+
+      {/* Clear categories */}
+      {hasSavedKey && (
+        <SettingsSection label="Categories">
+          {cleared ? (
+            <InlineAlert
+              color="emerald"
+              icon={<CheckCircle2 size={13} />}
+              msg="All categories cleared. They will be re-generated the next time you open the dashboard."
+            />
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-white/40">
+                Clear stored categories and re-run AI analysis
+              </span>
+              <button
+                type="button"
+                onClick={handleClearCategories}
+                className="text-[11px] font-semibold text-white/35 hover:text-violet-400 hover:bg-violet-500/8 transition-all duration-200 px-2.5 py-1 rounded-lg whitespace-nowrap ml-3"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </SettingsSection>
+      )}
+    </div>
+  );
+}
+
 // ── Danger Tab ────────────────────────────────────────────────────────────────
 
 function DangerTab({ onClose }: { onClose: () => void }) {
@@ -787,16 +920,18 @@ function EditBtn({ onClick }: { onClick: () => void }) {
 function PrimaryBtn({
   children,
   loading,
+  disabled,
   type = "submit",
 }: {
   children: ReactNode;
   loading?: boolean;
+  disabled?: boolean;
   type?: "submit" | "button" | "reset";
 }) {
   return (
     <button
       type={type}
-      disabled={loading}
+      disabled={loading || disabled}
       className="flex-1 py-2 text-sm font-semibold bg-linear-to-r from-violet-500 to-blue-500 text-white rounded-xl hover:brightness-110 active:scale-[0.98] transition-all duration-150 shadow-sm shadow-violet-500/15 disabled:opacity-50 flex items-center justify-center gap-1.5"
     >
       {loading && <Spinner size={13} className="text-white" />}

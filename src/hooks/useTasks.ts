@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { encrypt, decrypt } from "../lib/encryption";
+import { getOpenRouterKey, categorizeTask } from "../lib/openrouter";
 import type { Task, SubTask } from "../types/database.types";
 
 export interface CreateTaskData {
@@ -45,6 +46,160 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
   const [loadingActive, setLoadingActive] = useState(false);
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
+
+  const categoriesKey = `orbit:categories:${userId}`;
+  const [categories, setCategories] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem(`orbit:categories:${userId}`) ?? "{}",
+      ) as Record<string, string>;
+    } catch {
+      return {};
+    }
+  });
+  const [isCategorizingBackground, setIsCategorizingBackground] =
+    useState(false);
+  const categorizingRef = useRef(false);
+
+  const readStoredCategories = useCallback((): Record<string, string> => {
+    try {
+      return JSON.parse(localStorage.getItem(categoriesKey) ?? "{}") as Record<
+        string,
+        string
+      >;
+    } catch {
+      return {};
+    }
+  }, [categoriesKey]);
+
+  const writeStoredCategories = useCallback(
+    (next: Record<string, string>) => {
+      localStorage.setItem(categoriesKey, JSON.stringify(next));
+      setCategories({ ...next });
+    },
+    [categoriesKey],
+  );
+
+  const getExistingCategoryPool = useCallback(
+    (stored: Record<string, string>): string[] => {
+      return [...new Set(Object.values(stored).filter(Boolean))].sort();
+    },
+    [],
+  );
+
+  // Listen for category-clear events dispatched by the settings panel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ userId: string }>;
+      if (ce.detail.userId === userId) setCategories({});
+    };
+    window.addEventListener("orbit:categories:cleared", handler);
+    return () =>
+      window.removeEventListener("orbit:categories:cleared", handler);
+  }, [userId]);
+
+  /**
+   * Categorise all tasks that don't yet have a category.
+   * Reads the OpenRouter key from localStorage, prunes orphaned entries,
+   * and processes tasks sequentially to stay within free-tier rate limits.
+   */
+  const backgroundCategorize = useCallback(
+    async (tasks: Task[]) => {
+      if (categorizingRef.current) return;
+      const apiKey = getOpenRouterKey();
+      if (!apiKey) return;
+      categorizingRef.current = true;
+      setIsCategorizingBackground(true);
+      setAiStatus(null);
+      try {
+        const stored = readStoredCategories();
+        // Remove categories for tasks that no longer exist
+        const taskIds = new Set(tasks.map((t) => t.id));
+        const pruned: Record<string, string> = {};
+        for (const [id, cat] of Object.entries(stored)) {
+          if (taskIds.has(id)) pruned[id] = cat;
+        }
+        const uncategorized = tasks.filter((t) => !pruned[t.id]);
+        writeStoredCategories(pruned);
+
+        for (const task of uncategorized) {
+          if (!categorizingRef.current) break;
+          const existingCategories = getExistingCategoryPool(pruned);
+          const result = await categorizeTask(
+            task.title,
+            task.description,
+            apiKey,
+            existingCategories,
+          );
+          if (result.category) {
+            pruned[task.id] = result.category;
+            writeStoredCategories(pruned);
+            if (result.model) {
+              setAiStatus(`Using ${result.model}`);
+            }
+            continue;
+          }
+
+          if (result.error) {
+            setAiStatus(result.error);
+            setError(`AI categorization failed: ${result.error}`);
+            break;
+          }
+        }
+      } finally {
+        setIsCategorizingBackground(false);
+        categorizingRef.current = false;
+      }
+    },
+    [readStoredCategories, writeStoredCategories], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const categorizeSingleTask = useCallback(
+    async ({
+      taskId,
+      title,
+      description,
+    }: {
+      taskId: string;
+      title: string;
+      description?: string | null;
+    }) => {
+      const apiKey = getOpenRouterKey();
+      if (!apiKey) {
+        return {
+          category: null,
+          model: null,
+          error: "Missing OpenRouter API key.",
+        };
+      }
+
+      const stored = readStoredCategories();
+      const existingCategories = getExistingCategoryPool(stored);
+      const result = await categorizeTask(
+        title,
+        description,
+        apiKey,
+        existingCategories,
+      );
+      if (result.category) {
+        stored[taskId] = result.category;
+        writeStoredCategories(stored);
+        if (result.model) {
+          setAiStatus(`Using ${result.model}`);
+        }
+        return result;
+      }
+
+      if (result.error) {
+        setAiStatus(result.error);
+        setError(`AI categorization failed: ${result.error}`);
+      }
+
+      return result;
+    },
+    [getExistingCategoryPool, readStoredCategories, writeStoredCategories],
+  );
 
   const fetchActiveTasks = useCallback(async () => {
     if (!encryptionKey) return;
@@ -62,7 +217,32 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
       return;
     }
     const decrypted = await decryptTasks(data ?? [], encryptionKey);
-    setActiveTasks(decrypted);
+    const openTasks = decrypted.filter((task) => !task.completed);
+    const completedTasks = decrypted.filter((task) => task.completed);
+    setActiveTasks(openTasks);
+
+    if (completedTasks.length > 0) {
+      const archivedAt = new Date().toISOString();
+      const completedIds = completedTasks.map((task) => task.id);
+      const { error: archiveError } = await supabase
+        .from("tasks")
+        .update({ archived: true, archived_at: archivedAt })
+        .in("id", completedIds);
+
+      if (archiveError) {
+        setError(archiveError.message);
+      } else {
+        setArchivedTasks((prev) => [
+          ...completedTasks.map((task) => ({
+            ...task,
+            archived: true,
+            archived_at: archivedAt,
+          })),
+          ...prev.filter((task) => !completedIds.includes(task.id)),
+        ]);
+      }
+    }
+
     setLoadingActive(false);
   }, [userId, encryptionKey]);
 
@@ -146,43 +326,94 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
     id: string,
     completed: boolean,
   ): Promise<boolean> => {
+    const archivedAt = completed ? new Date().toISOString() : null;
     const { error } = await supabase
       .from("tasks")
-      .update({ completed })
+      .update({
+        completed,
+        archived: completed,
+        archived_at: archivedAt,
+      })
       .eq("id", id);
     if (error) {
       setError(error.message);
       return false;
     }
+
+    if (completed) {
+      const completedTask = activeTasks.find((t) => t.id === id);
+      setActiveTasks((prev) => prev.filter((t) => t.id !== id));
+      if (completedTask) {
+        setArchivedTasks((prev) => [
+          {
+            ...completedTask,
+            completed: true,
+            archived: true,
+            archived_at: archivedAt,
+          },
+          ...prev.filter((t) => t.id !== id),
+        ]);
+      }
+      return true;
+    }
+
     setActiveTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed } : t)),
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, completed: false, archived: false, archived_at: null }
+          : t,
+      ),
     );
     return true;
   };
 
   const archiveTask = async (id: string): Promise<boolean> => {
+    const archivedTask = activeTasks.find((t) => t.id === id);
+    const archivedAt = new Date().toISOString();
     const { error } = await supabase
       .from("tasks")
-      .update({ archived: true, archived_at: new Date().toISOString() })
+      .update({ archived: true, archived_at: archivedAt })
       .eq("id", id);
     if (error) {
       setError(error.message);
       return false;
     }
     setActiveTasks((prev) => prev.filter((t) => t.id !== id));
+    if (archivedTask) {
+      setArchivedTasks((prev) => [
+        {
+          ...archivedTask,
+          archived: true,
+          archived_at: archivedAt,
+        },
+        ...prev.filter((t) => t.id !== id),
+      ]);
+    }
     return true;
   };
 
   const unarchiveTask = async (id: string): Promise<boolean> => {
     const { error } = await supabase
       .from("tasks")
-      .update({ archived: false, archived_at: null })
+      .update({ archived: false, archived_at: null, completed: false })
       .eq("id", id);
     if (error) {
       setError(error.message);
       return false;
     }
+    const restoredTask = archivedTasks.find((t) => t.id === id);
     setArchivedTasks((prev) => prev.filter((t) => t.id !== id));
+    if (restoredTask) {
+      setActiveTasks((prev) => [
+        {
+          ...restoredTask,
+          archived: false,
+          archived_at: null,
+          completed: false,
+        },
+        ...prev,
+      ]);
+    }
     return true;
   };
 
@@ -337,6 +568,11 @@ export function useTasks(userId: string, encryptionKey: CryptoKey | null) {
     saveSubTasks,
     toggleSubTaskComplete,
     updateSubTaskTitle,
+    categories,
+    isCategorizingBackground,
+    aiStatus,
+    backgroundCategorize,
+    categorizeSingleTask,
   };
 }
 

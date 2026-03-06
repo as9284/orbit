@@ -9,7 +9,10 @@ import {
   ListTodo,
   Sparkles,
   ChevronDown,
+  Tag,
+  X,
 } from "lucide-react";
+import { getOpenRouterKey } from "../lib/openrouter";
 import { isPast, isToday, parseISO } from "date-fns";
 import { useTasksApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
@@ -21,7 +24,7 @@ import { Spinner } from "../components/ui/Spinner";
 import type { Task } from "../types/database.types";
 import type { SubTaskInput } from "../hooks/useTasks";
 
-type Filter = "all" | "active" | "completed" | "overdue";
+type Filter = "active" | "overdue";
 type Sort = "recent" | "priority" | "due";
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
@@ -48,6 +51,10 @@ function getGreeting() {
   return "Good evening";
 }
 
+function sanitizeStoredFilter(value: string | null): Filter {
+  return value === "overdue" ? "overdue" : "active";
+}
+
 export function DashboardPage() {
   const api = useTasksApi();
   const { encryptionKey } = useAuth();
@@ -55,12 +62,14 @@ export function DashboardPage() {
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [previewTask, setPreviewTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<Filter>(() => {
-    const saved = localStorage.getItem("orbit:dashboard:filter");
-    return (saved as Filter) || "all";
+    return sanitizeStoredFilter(localStorage.getItem("orbit:dashboard:filter"));
   });
   const [sort, setSort] = useState<Sort>(() => {
     const saved = localStorage.getItem("orbit:dashboard:sort");
     return (saved as Sort) || "recent";
+  });
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(() => {
+    return localStorage.getItem("orbit:dashboard:categoryFilter") || null;
   });
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -71,11 +80,37 @@ export function DashboardPage() {
   useEffect(() => {
     localStorage.setItem("orbit:dashboard:sort", sort);
   }, [sort]);
+  useEffect(() => {
+    if (categoryFilter) {
+      localStorage.setItem("orbit:dashboard:categoryFilter", categoryFilter);
+    } else {
+      localStorage.removeItem("orbit:dashboard:categoryFilter");
+    }
+  }, [categoryFilter]);
+
+  // Trigger background AI categorisation whenever tasks finish loading
+  useEffect(() => {
+    if (!api.loadingActive && api.activeTasks.length > 0) {
+      void api.backgroundCategorize(api.activeTasks);
+    }
+  }, [api.activeTasks]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (api.aiStatus && api.aiStatus.startsWith("Using ")) {
+      return;
+    }
+    if (api.aiStatus) {
+      toast.error(api.aiStatus, { id: "orbit-ai-status" });
+    }
+  }, [api.aiStatus]);
 
   // Re-fetch whenever the encryption key becomes available (covers the
   // fresh-sign-in case where the key isn't ready on initial mount).
   useEffect(() => {
-    if (encryptionKey) api.fetchActiveTasks();
+    if (encryptionKey) {
+      api.fetchActiveTasks();
+      api.fetchArchivedTasks();
+    }
   }, [encryptionKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcut: N to create new task
@@ -113,22 +148,25 @@ export function DashboardPage() {
   }, [sortOpen]);
 
   const stats = useMemo(() => {
-    const total = api.activeTasks.length;
-    const completed = api.activeTasks.filter((t) => t.completed).length;
-    const active = total - completed;
-    const overdue = api.activeTasks.filter(isOverdue).length;
+    const openTasks = api.activeTasks.filter((t) => !t.completed);
+    const completed = api.archivedTasks.filter((t) => t.completed).length;
+    const total = openTasks.length + completed;
+    const active = openTasks.length;
+    const overdue = openTasks.filter(isOverdue).length;
     return { total, completed, active, overdue };
-  }, [api.activeTasks]);
+  }, [api.activeTasks, api.archivedTasks]);
 
   const progressPercent =
     stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
   const displayed = useMemo(() => {
-    let tasks = [...api.activeTasks];
+    let tasks = api.activeTasks.filter((t) => !t.completed);
 
-    if (filter === "active") tasks = tasks.filter((t) => !t.completed);
-    else if (filter === "completed") tasks = tasks.filter((t) => t.completed);
-    else if (filter === "overdue") tasks = tasks.filter(isOverdue);
+    if (filter === "overdue") tasks = tasks.filter(isOverdue);
+
+    if (categoryFilter) {
+      tasks = tasks.filter((t) => api.categories[t.id] === categoryFilter);
+    }
 
     if (sort === "priority") {
       tasks.sort(
@@ -143,7 +181,23 @@ export function DashboardPage() {
     }
 
     return tasks;
-  }, [api.activeTasks, filter, sort]);
+  }, [api.activeTasks, api.categories, filter, sort, categoryFilter]);
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const task of api.activeTasks) {
+      const cat = api.categories[task.id];
+      if (cat) cats.add(cat);
+    }
+    return [...cats].sort();
+  }, [api.activeTasks, api.categories]);
+
+  // Clear category filter if the selected category no longer exists
+  useEffect(() => {
+    if (categoryFilter && !uniqueCategories.includes(categoryFilter)) {
+      setCategoryFilter(null);
+    }
+  }, [uniqueCategories, categoryFilter]);
 
   const handleCreate = async (
     data: Parameters<typeof api.createTask>[0],
@@ -179,7 +233,14 @@ export function DashboardPage() {
 
   const handleToggle = async (id: string, completed: boolean) => {
     const ok = await api.toggleComplete(id, completed);
-    if (!ok) toast.error("Failed to update task");
+    if (!ok) {
+      toast.error("Failed to update task");
+      return ok;
+    }
+    if (completed) {
+      if (previewTask?.id === id) setPreviewTask(null);
+      toast.success("Task completed and archived");
+    }
     return ok;
   };
 
@@ -282,7 +343,7 @@ export function DashboardPage() {
           role="tablist"
           aria-label="Task filters"
         >
-          {(["all", "active", "completed", "overdue"] as Filter[]).map((f) => (
+          {(["active", "overdue"] as Filter[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -349,13 +410,76 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* Category filter chips */}
+      {(uniqueCategories.length > 0 || api.isCategorizingBackground) && (
+        <div
+          className="flex items-center gap-2 flex-wrap mb-4 animate-fade-in"
+          style={{ animationDelay: "120ms" }}
+        >
+          <span className="flex items-center gap-1 text-[10px] text-white/25 font-semibold uppercase tracking-widest shrink-0">
+            <Tag size={10} />
+            Category
+            {api.isCategorizingBackground && (
+              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-pulse" />
+            )}
+          </span>
+          {uniqueCategories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() =>
+                setCategoryFilter(cat === categoryFilter ? null : cat)
+              }
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 border ${
+                categoryFilter === cat
+                  ? "bg-violet-500/20 text-violet-300 border-violet-500/30"
+                  : "bg-white/4 text-white/40 border-white/8 hover:text-white/65 hover:bg-white/7 hover:border-white/15"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+          {categoryFilter && (
+            <button
+              onClick={() => setCategoryFilter(null)}
+              className="flex items-center gap-1 text-[11px] text-white/25 hover:text-white/50 transition-colors"
+              aria-label="Clear category filter"
+            >
+              <X size={10} />
+              Clear
+            </button>
+          )}
+          {!api.isCategorizingBackground &&
+            getOpenRouterKey() &&
+            api.activeTasks.some((t) => !api.categories[t.id]) && (
+              <button
+                onClick={() => void api.backgroundCategorize(api.activeTasks)}
+                className="ml-auto flex items-center gap-1 text-[11px] text-white/25 hover:text-violet-400 transition-colors"
+                title="Categorise remaining tasks"
+              >
+                <Sparkles size={11} />
+                Categorise
+              </button>
+            )}
+        </div>
+      )}
+
+      {api.aiStatus && !api.aiStatus.startsWith("Using ") && (
+        <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/6 px-3 py-2 text-xs text-amber-200/80">
+          {api.aiStatus}
+        </div>
+      )}
+
       {/* Task list */}
       {api.loadingActive ? (
         <div className="flex items-center justify-center py-24">
           <Spinner size={24} className="text-white/20" />
         </div>
       ) : displayed.length === 0 ? (
-        <EmptyState filter={filter} onNew={openCreate} />
+        <EmptyState
+          filter={filter}
+          category={categoryFilter}
+          onNew={openCreate}
+        />
       ) : (
         <div className="space-y-2">
           {displayed.map((task, i) => (
@@ -434,24 +558,49 @@ function StatCard({ label, value, icon, color, valueColor }: StatCardProps) {
   );
 }
 
-function EmptyState({ filter, onNew }: { filter: Filter; onNew: () => void }) {
+function EmptyState({
+  filter,
+  category,
+  onNew,
+}: {
+  filter: Filter;
+  category: string | null;
+  onNew: () => void;
+}) {
+  if (category) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
+        <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/7 flex items-center justify-center mb-5">
+          <Tag size={20} className="text-white/15" />
+        </div>
+        <p className="text-white/35 text-sm font-medium">
+          No tasks in &ldquo;{category}&rdquo;
+        </p>
+        <button
+          onClick={onNew}
+          className="mt-4 flex items-center gap-2 px-5 py-2.5 border border-white/10 text-white/45 hover:text-white/75 hover:border-white/20 hover:bg-white/4 rounded-xl text-sm font-medium transition-all duration-200 focus-ring"
+        >
+          <Plus size={15} />
+          New task
+        </button>
+      </div>
+    );
+  }
   const msgs: Record<Filter, string> = {
-    all: "No tasks yet. Create your first one to get started.",
     active: "No active tasks right now.",
-    completed: "No completed tasks yet.",
     overdue: "No overdue tasks — you're on track!",
   };
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
       <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/7 flex items-center justify-center mb-5 animate-float">
-        {filter === "all" ? (
+        {filter === "active" ? (
           <Sparkles size={22} className="text-violet-400/40" />
         ) : (
           <ListTodo size={22} className="text-white/15" />
         )}
       </div>
       <p className="text-white/35 text-sm font-medium">{msgs[filter]}</p>
-      {filter === "all" && (
+      {filter === "active" && (
         <button
           onClick={onNew}
           className="mt-5 flex items-center gap-2 px-5 py-2.5 border border-white/10 text-white/45 hover:text-white/75 hover:border-white/20 hover:bg-white/4 rounded-xl text-sm font-medium transition-all duration-200 focus-ring"

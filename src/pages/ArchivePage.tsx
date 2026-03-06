@@ -86,8 +86,8 @@ export function ArchivePage() {
       {/* Info banner */}
       <div className="flex items-start gap-2.5 p-3.5 mb-6 bg-white/3 border border-white/6 rounded-xl text-xs text-white/35">
         <Archive size={13} className="mt-0.5 shrink-0 text-violet-400/40" />
-        Archived tasks are hidden from your dashboard. You can restore them or
-        delete them permanently.
+        Completed tasks move here automatically. Archived tasks stay off the
+        dashboard until you restore them or delete them permanently.
       </div>
 
       {/* List */}
