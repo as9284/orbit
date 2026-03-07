@@ -16,9 +16,14 @@ import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { CreateNoteModal } from "../components/notes/CreateNoteModal";
 import { EditNoteModal } from "../components/notes/EditNoteModal";
 import { NotePreviewModal } from "../components/notes/NotePreviewModal";
+import { NoteSummaryModal } from "../components/notes/NoteSummaryModal";
 import { stripMarkdown } from "../lib/markdown";
 import { isFeatureReady } from "../lib/ai";
-import { convertNoteToTaskDraft } from "../lib/openrouter";
+import {
+  convertNoteToTaskDraft,
+  summarizeNote,
+  type AiNoteSummary,
+} from "../lib/openrouter";
 import type { Note } from "../types/database.types";
 
 export function NotesPage() {
@@ -31,7 +36,14 @@ export function NotesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [convertingNoteId, setConvertingNoteId] = useState<string | null>(null);
+  const [summarizingNoteId, setSummarizingNoteId] = useState<string | null>(
+    null,
+  );
   const [postConvertNote, setPostConvertNote] = useState<Note | null>(null);
+  const [summaryNote, setSummaryNote] = useState<Note | null>(null);
+  const [activeSummary, setActiveSummary] = useState<AiNoteSummary | null>(
+    null,
+  );
 
   // Re-render when AI settings change so feature checks update immediately
   const [, setAiTick] = useState(0);
@@ -106,10 +118,16 @@ export function NotesPage() {
     [api],
   );
 
+  const closePreview = useCallback(() => {
+    setPreviewNote(null);
+    setSummaryNote(null);
+    setActiveSummary(null);
+  }, []);
+
   const handleConvertToTask = useCallback(
     async (note: Note) => {
-      if (!isFeatureReady("noteToTask")) {
-        toast.error("Enable Note → Task in Settings → Luna first");
+      if (!isFeatureReady("noteTools")) {
+        toast.error("Enable Note AI features in Settings → Luna first");
         return;
       }
 
@@ -171,6 +189,34 @@ export function NotesPage() {
     },
     [tasksApi],
   );
+
+  const handleSummarizeNote = useCallback(async (note: Note) => {
+    if (!isFeatureReady("noteTools")) {
+      toast.error("Enable Note AI features in Settings → Luna first");
+      return;
+    }
+
+    setSummarizingNoteId(note.id);
+    try {
+      const result = await summarizeNote(note.title, note.content);
+
+      if (!result.summary) {
+        toast.error(result.error || "Luna couldn't summarize this note");
+        return;
+      }
+
+      setSummaryNote(note);
+      setActiveSummary(result.summary);
+
+      toast.success(
+        result.model
+          ? `Summary ready via ${result.model}`
+          : "Summary ready with Luna",
+      );
+    } finally {
+      setSummarizingNoteId(null);
+    }
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-10 animate-fade-in">
@@ -273,12 +319,24 @@ export function NotesPage() {
       <NotePreviewModal
         note={previewNote}
         converting={previewNote?.id === convertingNoteId}
-        onClose={() => setPreviewNote(null)}
+        summarizing={previewNote?.id === summarizingNoteId}
+        summaryOpen={!!summaryNote && !!activeSummary}
+        onClose={closePreview}
         onEdit={(n) => {
-          setPreviewNote(null);
+          closePreview();
           setEditNote(n);
         }}
         onConvert={handleConvertToTask}
+        onSummarize={handleSummarizeNote}
+      />
+      <NoteSummaryModal
+        open={!!summaryNote && !!activeSummary}
+        note={summaryNote}
+        summary={activeSummary}
+        onClose={() => {
+          setSummaryNote(null);
+          setActiveSummary(null);
+        }}
       />
       <ConfirmModal
         open={!!deleteId}

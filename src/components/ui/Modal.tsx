@@ -7,6 +7,11 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   maxWidth?: string;
+  closeOnEscape?: boolean;
+  closeOnOverlayClick?: boolean;
+  zIndexClassName?: string;
+  backdropClassName?: string;
+  panelClassName?: string;
 }
 
 export function Modal({
@@ -15,6 +20,11 @@ export function Modal({
   title,
   children,
   maxWidth = "max-w-lg",
+  closeOnEscape = true,
+  closeOnOverlayClick = true,
+  zIndexClassName = "z-50",
+  backdropClassName = "",
+  panelClassName = "",
 }: ModalProps) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -58,21 +68,35 @@ export function Modal({
   // Body scroll lock
   useEffect(() => {
     if (!mounted) return;
+    const currentCount = Number(document.body.dataset.orbitModalCount ?? "0");
+    document.body.dataset.orbitModalCount = String(currentCount + 1);
     document.body.style.overflow = "hidden";
+
     return () => {
-      document.body.style.overflow = "";
+      const nextCount = Math.max(
+        0,
+        Number(document.body.dataset.orbitModalCount ?? "1") - 1,
+      );
+
+      if (nextCount === 0) {
+        delete document.body.dataset.orbitModalCount;
+        document.body.style.overflow = "";
+        return;
+      }
+
+      document.body.dataset.orbitModalCount = String(nextCount);
     };
   }, [mounted]);
 
   // Escape key
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !closeOnEscape) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [mounted, onClose]);
+  }, [mounted, onClose, closeOnEscape]);
 
   // Focus trap — re-queries on every Tab so dynamically-rendered
   // children (e.g. date picker calendar) are always included
@@ -111,15 +135,15 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+      className={`fixed inset-0 ${zIndexClassName} flex items-end sm:items-center justify-center sm:p-4`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      onClick={onClose}
+      onClick={closeOnOverlayClick ? onClose : undefined}
     >
       {/* Backdrop */}
       <div
-        className={`absolute inset-0 bg-orbit-950/85 backdrop-blur-sm transition-opacity duration-200 ease-out ${
+        className={`absolute inset-0 bg-orbit-950/85 backdrop-blur-sm transition-opacity duration-200 ease-out ${backdropClassName} ${
           visible ? "opacity-100" : "opacity-0"
         }`}
       />
@@ -127,7 +151,7 @@ export function Modal({
       {/* Panel */}
       <div
         ref={panelRef}
-        className={`relative w-full ${maxWidth} bg-orbit-800 border border-white/9 rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/60 max-h-[92dvh] flex flex-col transition-all duration-200 ease-out ${
+        className={`relative w-full ${maxWidth} bg-orbit-800 border border-white/9 rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/60 max-h-[92dvh] flex flex-col transition-all duration-200 ease-out ${panelClassName} ${
           visible
             ? "opacity-100 scale-100 translate-y-0"
             : "opacity-0 scale-[0.96] translate-y-3"

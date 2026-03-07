@@ -781,9 +781,9 @@ function AITab() {
               desc: "Luna automatically assigns a category to new tasks",
             },
             {
-              key: "noteToTask" as const,
-              label: "Note → Task conversion",
-              desc: "Convert notes into structured tasks with Luna",
+              key: "noteTools" as const,
+              label: "Note AI features",
+              desc: "Enable note summaries and note-to-task conversion",
             },
             {
               key: "lunaChat" as const,

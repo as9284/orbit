@@ -95,15 +95,15 @@ export const PROVIDER_LIST: ProviderConfig[] = [
 export interface AiFeatures {
   /** Auto-categorize tasks in background */
   autoCategorize: boolean;
-  /** Luna-to-task conversion on notes */
-  noteToTask: boolean;
+  /** Note-specific AI actions like summary and task conversion */
+  noteTools: boolean;
   /** Luna chat page */
   lunaChat: boolean;
 }
 
 const DEFAULT_FEATURES: AiFeatures = {
   autoCategorize: false,
-  noteToTask: false,
+  noteTools: false,
   lunaChat: false,
 };
 
@@ -134,13 +134,28 @@ export function getAiSettings(): AiSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return migrateFromLegacy();
-    const parsed = JSON.parse(raw) as Partial<AiSettings>;
+    const parsed = JSON.parse(raw) as Partial<AiSettings> & {
+      features?: Partial<AiFeatures> & {
+        noteSummary?: boolean;
+        noteToTask?: boolean;
+      };
+    };
     const defaults = defaultSettings();
+    const legacyNoteTools =
+      parsed.features?.noteTools ??
+      parsed.features?.noteSummary ??
+      parsed.features?.noteToTask ??
+      false;
+
     return {
       provider: parsed.provider ?? defaults.provider,
       keys: { ...defaults.keys, ...parsed.keys },
       model: { ...defaults.model, ...parsed.model },
-      features: { ...defaults.features, ...parsed.features },
+      features: {
+        ...defaults.features,
+        ...parsed.features,
+        noteTools: legacyNoteTools,
+      },
     };
   } catch {
     return defaultSettings();

@@ -41,6 +41,19 @@ export interface ConvertNoteToTaskResult {
   error: string | null;
 }
 
+export interface AiNoteSummary {
+  headline: string;
+  summary: string;
+  keyPoints: string[];
+  nextSteps: string[];
+}
+
+export interface SummarizeNoteResult {
+  summary: AiNoteSummary | null;
+  model: string | null;
+  error: string | null;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
@@ -210,6 +223,51 @@ function parseTaskDraft(text: string): AiTaskDraft | null {
   }
 }
 
+function coerceStringList(value: unknown, maxItems: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function parseNoteSummary(text: string, title: string): AiNoteSummary | null {
+  try {
+    const parsed = JSON.parse(
+      stripMarkdownCodeFence(text),
+    ) as Partial<AiNoteSummary>;
+    const headline = parsed.headline?.trim() || title.trim() || "Note summary";
+    const summary = parsed.summary?.trim();
+    if (!summary) return null;
+
+    return {
+      headline,
+      summary,
+      keyPoints: coerceStringList(parsed.keyPoints, 5),
+      nextSteps: coerceStringList(parsed.nextSteps, 4),
+    };
+  } catch {
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+
+    const lines = trimmed
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const bulletLines = lines
+      .filter((line) => /^[-*•]|^\d+[.)]\s/.test(line))
+      .map(cleanSubTaskCandidate)
+      .slice(0, 5);
+
+    return {
+      headline: title.trim() || "Note summary",
+      summary: lines[0] ?? trimmed,
+      keyPoints: bulletLines,
+      nextSteps: [],
+    };
+  }
+}
+
 function cleanSubTaskCandidate(value: string): string {
   return value
     .trim()
@@ -343,6 +401,48 @@ export async function convertNoteToTaskDraft(
   }
 
   return { draft, model: result.model, error: null };
+}
+
+export async function summarizeNote(
+  title: string,
+  content: string | null | undefined,
+  _apiKey?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+): Promise<SummarizeNoteResult> {
+  const prompt = [
+    "You are Luna, the AI assistant inside a notes app.",
+    "Summarize the following note for a quick, polished in-app summary view.",
+    "Respond with raw JSON only. No markdown fences. No commentary outside the JSON.",
+    "",
+    'Required JSON shape: {"headline":"string","summary":"string","keyPoints":["string"],"nextSteps":["string"]}',
+    "",
+    "Rules:",
+    "- headline: 3-8 words, sharp and descriptive, not identical to the note title unless needed",
+    "- summary: 2-4 concise sentences that capture the essence, context, and why it matters",
+    "- keyPoints: 2-5 short bullets with concrete facts, decisions, themes, or constraints from the note",
+    "- nextSteps: 0-4 brief action suggestions only when the note implies obvious follow-up actions; otherwise return []",
+    "- Avoid filler, repetition, and generic productivity advice",
+    "- Stay faithful to the note. Do not invent facts",
+    "",
+    "=== INPUT NOTE ===",
+    `Title: ${title}`,
+    `Content: ${content || "(empty)"}`,
+  ].join("\n");
+
+  const result = await requestAiText(prompt, 450);
+  if (!result.text) {
+    return { summary: null, model: result.model, error: result.error };
+  }
+
+  const summary = parseNoteSummary(result.text, title);
+  if (!summary) {
+    return {
+      summary: null,
+      model: result.model,
+      error: `Luna returned an invalid summary payload: ${result.text.slice(0, 180)}`,
+    };
+  }
+
+  return { summary, model: result.model, error: null };
 }
 
 // ── Luna Chat ────────────────────────────────────────────────────────────────
