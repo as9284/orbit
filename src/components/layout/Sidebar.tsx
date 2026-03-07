@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import {
   ListTodo,
   Archive,
@@ -118,7 +118,6 @@ export function Sidebar() {
 
 export function MobileNav() {
   const { user } = useAuth();
-  const location = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsKey, setSettingsKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -138,10 +137,6 @@ export function MobileNav() {
     setSettingsOpen(true);
     setMenuOpen(false);
   };
-
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -236,6 +231,7 @@ export function MobileNav() {
                   key={to}
                   to={to}
                   end
+                  onClick={() => setMenuOpen(false)}
                   className={({ isActive }) =>
                     `group flex items-center gap-4 rounded-3xl border px-4 py-4 transition-all duration-200 focus-ring ${
                       isActive

@@ -39,6 +39,11 @@ interface StoredMeetingState {
   sessions: MeetingSession[];
 }
 
+interface StoredMeetingSnapshot {
+  storageKey: string;
+  state: StoredMeetingState;
+}
+
 const STORAGE_PREFIX = "orbit:meeting-sessions";
 const STORAGE_EVENT = "orbit:meeting-sessions:changed";
 
@@ -99,37 +104,26 @@ function writeStoredState(storageKey: string, state: StoredMeetingState): void {
 
 export function useMeetingSessions(userId?: string) {
   const storageKey = createStorageKey(userId);
-  const [state, setState] = useState<StoredMeetingState>(() =>
-    readStoredState(storageKey),
-  );
+  const [snapshot, setSnapshot] = useState<StoredMeetingSnapshot>(() => ({
+    storageKey,
+    state: readStoredState(storageKey),
+  }));
+  const state =
+    snapshot.storageKey === storageKey
+      ? snapshot.state
+      : readStoredState(storageKey);
   const stateRef = useRef(state);
-  const mountedRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
   useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const nextState = readStoredState(storageKey);
-    stateRef.current = nextState;
-    setState(nextState);
-  }, [storageKey]);
-
-  useEffect(() => {
     const syncState = (nextStorageKey?: string) => {
       if (nextStorageKey && nextStorageKey !== storageKey) return;
       const nextState = readStoredState(storageKey);
       stateRef.current = nextState;
-      if (mountedRef.current) {
-        setState(nextState);
-      }
+      setSnapshot({ storageKey, state: nextState });
     };
 
     const handleStorage = (event: StorageEvent) => {
@@ -158,10 +152,8 @@ export function useMeetingSessions(userId?: string) {
     (updater: (current: StoredMeetingState) => StoredMeetingState) => {
       const next = updater(stateRef.current);
       stateRef.current = next;
+      setSnapshot({ storageKey, state: next });
       writeStoredState(storageKey, next);
-      if (mountedRef.current) {
-        setState(next);
-      }
       return next;
     },
     [storageKey],

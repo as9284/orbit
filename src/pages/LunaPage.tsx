@@ -454,6 +454,7 @@ export function LunaPage() {
     [
       closeActiveAssistantMessage,
       createToolStatusMessage,
+      ensureActiveAssistantMessage,
       input,
       streaming,
       messages,
