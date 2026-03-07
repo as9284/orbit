@@ -99,12 +99,15 @@ export interface AiFeatures {
   noteTools: boolean;
   /** Luna chat page */
   lunaChat: boolean;
+  /** Meeting capture and AI wrap-up */
+  meetingMode: boolean;
 }
 
 const DEFAULT_FEATURES: AiFeatures = {
   autoCategorize: false,
   noteTools: false,
   lunaChat: false,
+  meetingMode: false,
 };
 
 // ── Settings shape ───────────────────────────────────────────────────────────

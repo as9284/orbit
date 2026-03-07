@@ -54,6 +54,22 @@ export interface SummarizeNoteResult {
   error: string | null;
 }
 
+export interface MeetingNoteDraft {
+  title: string;
+  content: string;
+}
+
+export interface MeetingArtifactsDraft {
+  note: MeetingNoteDraft;
+  task: AiTaskDraft;
+}
+
+export interface GenerateMeetingArtifactsResult {
+  artifacts: MeetingArtifactsDraft | null;
+  model: string | null;
+  error: string | null;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
@@ -290,6 +306,81 @@ function inferSubTasksFromNote(content: string | null | undefined): string[] {
   return [...new Set(candidates)].slice(0, 6);
 }
 
+function fallbackMeetingArtifacts(
+  title: string,
+  notes: string[],
+): MeetingArtifactsDraft {
+  const normalizedTitle = title.trim() || "Meeting";
+  const noteTitle = normalizedTitle.toLowerCase().includes("meeting")
+    ? normalizedTitle
+    : `${normalizedTitle} Meeting`;
+  const transcript = notes.map((note) => `- ${note}`).join("\n");
+  const summary = notes.slice(0, 3).join(" ").trim();
+  const joinedNotes = notes.join("\n");
+
+  return {
+    note: {
+      title: noteTitle,
+      content: ["## Meeting Notes", "", transcript].join("\n"),
+    },
+    task: {
+      title: `Review follow-ups from ${normalizedTitle}`,
+      description:
+        summary ||
+        "Review the captured meeting notes and confirm next actions.",
+      priority: "medium",
+      subTasks: inferSubTasksFromNote(joinedNotes),
+    },
+  };
+}
+
+function parseMeetingArtifacts(
+  text: string,
+  fallback: MeetingArtifactsDraft,
+): MeetingArtifactsDraft | null {
+  try {
+    const parsed = JSON.parse(stripMarkdownCodeFence(text)) as {
+      note?: Partial<MeetingNoteDraft>;
+      task?: Partial<AiTaskDraft>;
+    };
+
+    const noteTitle = parsed.note?.title?.trim() || fallback.note.title;
+    const noteContent = parsed.note?.content?.trim() || fallback.note.content;
+    const task = parsed.task;
+    const taskTitle = task?.title?.trim();
+    if (!taskTitle) return null;
+
+    const priority =
+      task?.priority === "low" ||
+      task?.priority === "medium" ||
+      task?.priority === "high"
+        ? task.priority
+        : fallback.task.priority;
+
+    const subTasks = Array.isArray(task?.subTasks)
+      ? task.subTasks
+          .map((item) => String(item).trim())
+          .filter(Boolean)
+          .slice(0, 6)
+      : fallback.task.subTasks;
+
+    return {
+      note: {
+        title: noteTitle,
+        content: noteContent,
+      },
+      task: {
+        title: taskTitle,
+        description: task?.description?.trim() || fallback.task.description,
+        priority,
+        subTasks,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ── Categorize Task ──────────────────────────────────────────────────────────
 
 export async function categorizeTask(
@@ -444,6 +535,75 @@ export async function summarizeNote(
   }
 
   return { summary, model: result.model, error: null };
+}
+
+export async function generateMeetingArtifacts(
+  title: string,
+  notes: string[],
+): Promise<GenerateMeetingArtifactsResult> {
+  const cleanedNotes = notes.map((note) => note.trim()).filter(Boolean);
+  if (cleanedNotes.length === 0) {
+    return {
+      artifacts: null,
+      model: null,
+      error: "Add at least one meeting note before ending the session.",
+    };
+  }
+
+  const fallback = fallbackMeetingArtifacts(title, cleanedNotes);
+  const prompt = [
+    "You are Luna inside Orbit. Convert these raw meeting notes into one polished note and one actionable follow-up task.",
+    "Respond with raw JSON only. No markdown fences. No commentary.",
+    "",
+    'Required JSON shape: {"note":{"title":"string","content":"string"},"task":{"title":"string","description":"string","priority":"low|medium|high","subTasks":["string"]}}',
+    "",
+    "Rules for the note:",
+    "- Title should be concise and specific to the meeting.",
+    "- Content must be markdown.",
+    "- Prefer a clean structure with headings like Summary, Decisions, Risks, and Action Items when supported by the notes.",
+    "- Stay faithful to the notes. Do not invent facts.",
+    "",
+    "Rules for the task:",
+    "- Create exactly one task representing the most important next step from the meeting.",
+    "- Use an action-oriented title starting with a verb.",
+    "- description should give enough context for someone reopening the task later.",
+    "- subTasks should capture concrete follow-up items when they exist.",
+    "- If the meeting has no obvious action item, create a task to review the meeting outcomes.",
+    "",
+    `Meeting title: ${title.trim() || "Meeting"}`,
+    "Meeting notes:",
+    ...cleanedNotes.map((note, index) => `${index + 1}. ${note}`),
+  ].join("\n");
+
+  const result = await requestAiText(prompt, 700);
+  if (!result.text) {
+    return {
+      artifacts: null,
+      model: result.model,
+      error: result.error,
+    };
+  }
+
+  const artifacts = parseMeetingArtifacts(result.text, fallback);
+  if (!artifacts) {
+    return {
+      artifacts: fallback,
+      model: result.model,
+      error:
+        "Luna returned an invalid meeting payload. Orbit used a structured fallback instead.",
+    };
+  }
+
+  if (artifacts.task.subTasks.length === 0) {
+    const inferred = inferSubTasksFromNote(cleanedNotes.join("\n"));
+    if (inferred.length > 0) artifacts.task.subTasks = inferred;
+  }
+
+  return {
+    artifacts,
+    model: result.model,
+    error: null,
+  };
 }
 
 // ── Luna Chat ────────────────────────────────────────────────────────────────

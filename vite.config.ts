@@ -62,6 +62,36 @@ export default defineConfig(({ mode }) => {
     define: {
       __ORBIT_SITE_URL__: JSON.stringify(siteUrl),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return;
+
+            if (
+              id.includes("react/") ||
+              id.includes("react-dom/") ||
+              id.includes("scheduler/") ||
+              id.includes("react-router")
+            ) {
+              return "react-core";
+            }
+
+            if (id.includes("@supabase/")) {
+              return "supabase";
+            }
+
+            if (id.includes("react-hot-toast") || id.includes("lucide-react")) {
+              return "ui-vendor";
+            }
+
+            if (id.includes("date-fns")) {
+              return "date-utils";
+            }
+          },
+        },
+      },
+    },
     plugins: [
       tailwindcss(),
       react(),

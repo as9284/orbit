@@ -5,6 +5,7 @@ import {
   Settings,
   StickyNote,
   BrainCircuit,
+  MessagesSquare,
   Menu,
   X,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { SettingsModal } from "../settings/SettingsModal";
 const NAV = [
   { icon: ListTodo, label: "Tasks", to: "/" },
   { icon: StickyNote, label: "Notes", to: "/notes" },
+  { icon: MessagesSquare, label: "Meeting", to: "/meeting" },
   { icon: BrainCircuit, label: "Luna", to: "/luna" },
   { icon: Archive, label: "Archive", to: "/archive" },
 ];

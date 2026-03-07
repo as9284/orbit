@@ -1,14 +1,53 @@
+import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { AuthPage } from "./components/auth/AuthPage";
-import { AppLayout } from "./components/layout/AppLayout";
-import { DashboardPage } from "./pages/DashboardPage";
-import { ArchivePage } from "./pages/ArchivePage";
-import { NotesPage } from "./pages/NotesPage";
-import { LunaPage } from "./pages/LunaPage";
 import { Spinner } from "./components/ui/Spinner";
 import { RouteMetadata } from "./components/seo/RouteMetadata";
+
+const AuthPage = lazy(() =>
+  import("./components/auth/AuthPage").then((module) => ({
+    default: module.AuthPage,
+  })),
+);
+const AppLayout = lazy(() =>
+  import("./components/layout/AppLayout").then((module) => ({
+    default: module.AppLayout,
+  })),
+);
+const DashboardPage = lazy(() =>
+  import("./pages/DashboardPage").then((module) => ({
+    default: module.DashboardPage,
+  })),
+);
+const ArchivePage = lazy(() =>
+  import("./pages/ArchivePage").then((module) => ({
+    default: module.ArchivePage,
+  })),
+);
+const NotesPage = lazy(() =>
+  import("./pages/NotesPage").then((module) => ({
+    default: module.NotesPage,
+  })),
+);
+const LunaPage = lazy(() =>
+  import("./pages/LunaPage").then((module) => ({
+    default: module.LunaPage,
+  })),
+);
+const MeetingModePage = lazy(() =>
+  import("./pages/MeetingModePage").then((module) => ({
+    default: module.MeetingModePage,
+  })),
+);
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-orbit-950">
+      <Spinner size={28} className="text-white/20" />
+    </div>
+  );
+}
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -30,7 +69,9 @@ function AppContent() {
     return (
       <>
         <RouteMetadata authState={authState} />
-        <AuthPage />
+        <Suspense fallback={<RouteFallback />}>
+          <AuthPage />
+        </Suspense>
       </>
     );
   }
@@ -38,15 +79,18 @@ function AppContent() {
   return (
     <>
       <RouteMetadata authState={authState} />
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="notes" element={<NotesPage />} />
-          <Route path="luna" element={<LunaPage />} />
-          <Route path="archive" element={<ArchivePage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="notes" element={<NotesPage />} />
+            <Route path="meeting" element={<MeetingModePage />} />
+            <Route path="luna" element={<LunaPage />} />
+            <Route path="archive" element={<ArchivePage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </>
   );
 }

@@ -23,6 +23,11 @@ const privateRouteMetadata: Record<string, Omit<RouteMeta, "robots">> = {
     description:
       "Capture, organize, and revisit notes inside your Orbit workspace.",
   },
+  "/meeting": {
+    title: "Meeting Mode | Orbit",
+    description:
+      "Capture live meeting notes and turn them into follow-up work inside Orbit.",
+  },
   "/luna": {
     title: "Luna | Orbit",
     description:

@@ -771,10 +771,14 @@ function AITab() {
         />
       </SettingsSection>
 
-      {/* Feature toggles */}
       <SettingsSection label="Features">
         <div className="space-y-2">
           {[
+            {
+              key: "meetingMode" as const,
+              label: "Meeting Mode",
+              desc: "Capture meeting notes and let Luna create one note and one follow-up task when the session ends",
+            },
             {
               key: "autoCategorize" as const,
               label: "Auto-categorize tasks",
@@ -1002,8 +1006,8 @@ function ModelDropdown({
         onClick={() => setOpen((v) => !v)}
         className={`w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs transition-all duration-200 ${
           open
-            ? "border-violet-500/30 bg-white/[0.06]"
-            : "border-white/8 bg-white/[0.04] hover:border-white/15"
+            ? "border-violet-500/30 bg-white/6"
+            : "border-white/8 bg-white/4 hover:border-white/15"
         }`}
       >
         <span className="flex-1 text-left text-white/80 font-medium">
@@ -1031,7 +1035,7 @@ function ModelDropdown({
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute z-20 top-full left-0 right-0 mt-1.5 rounded-xl border border-white/[0.09] bg-orbit-900 shadow-2xl shadow-black/60 overflow-hidden">
+        <div className="absolute z-20 top-full left-0 right-0 mt-1.5 rounded-xl border border-white/9 bg-orbit-900 shadow-2xl shadow-black/60 overflow-hidden">
           {models.map((m) => {
             const active = m.id === value;
             return (
@@ -1045,7 +1049,7 @@ function ModelDropdown({
                 className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs transition-colors duration-150 ${
                   active
                     ? "bg-violet-500/10 text-white/90"
-                    : "text-white/55 hover:bg-white/[0.05] hover:text-white/80"
+                    : "text-white/55 hover:bg-white/5 hover:text-white/80"
                 }`}
               >
                 <span
