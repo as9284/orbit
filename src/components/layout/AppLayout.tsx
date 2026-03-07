@@ -25,7 +25,7 @@ export function AppLayout() {
       </div>
       <Sidebar />
       <MobileNav />
-      <main className="flex-1 min-w-0 relative pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+      <main className="flex-1 min-w-0 relative">
         <Outlet context={{ tasksApi, notesApi } satisfies OutletContextType} />
       </main>
     </div>

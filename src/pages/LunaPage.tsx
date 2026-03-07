@@ -500,9 +500,9 @@ export function LunaPage() {
   const hasKey = hasApiKey() && isFeatureReady("lunaChat");
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem-env(safe-area-inset-bottom))] md:h-screen animate-fade-in">
+    <div className="flex flex-col h-dvh md:h-screen animate-fade-in">
       {/* Header */}
-      <header className="shrink-0 border-b border-white/6 px-4 sm:px-6 h-18 flex items-center gap-3">
+      <header className="shrink-0 border-b border-white/6 px-4 pr-17 sm:px-6 sm:pr-6 h-18 flex items-center gap-3">
         <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center">
           <BrainCircuit size={16} className="text-violet-400" />
         </div>
