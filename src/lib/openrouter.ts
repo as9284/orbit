@@ -835,6 +835,10 @@ export async function streamLunaChat(
             tool_call_id: tc.id || `call_${tc.name}_${round}`,
           })),
         ];
+
+        // After tools run, force the follow-up conclusion round to be plain
+        // generation rather than another reasoning pass.
+        allowThinking = false;
       }
 
       if (modelFailed) continue;
@@ -1024,6 +1028,10 @@ async function nonStreamingFallback(
         tool_call_id: tc.id ?? `call_${tc.function.name}_${round}`,
       })),
     ];
+
+    // After tools run, force the follow-up conclusion round to be plain
+    // generation rather than another reasoning pass.
+    allowThinking = false;
   }
 
   callbacks.onDone(accumText, accumReasoning || undefined);
