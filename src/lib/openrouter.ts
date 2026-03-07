@@ -675,34 +675,106 @@ const LUNA_TOOLS: LunaTool[] = [
 export function buildLunaSystemPrompt(context: {
   tasks: {
     title: string;
+    description?: string | null;
     priority: string;
     due_date?: string | null;
     completed: boolean;
   }[];
-  notes: { title: string }[];
+  notes: { title: string; content?: string | null; updated_at?: string }[];
+  meetingSessions?: {
+    active: {
+      title: string;
+      startedAt: string;
+      entries: { content: string; createdAt: string }[];
+    } | null;
+    completed: {
+      title: string;
+      endedAt: string | null;
+      artifactNote?: string | null;
+      artifactTask?: string | null;
+    }[];
+  };
 }): string {
+  const now = new Date().toISOString();
+
   const taskLines = context.tasks
-    .slice(0, 30)
-    .map(
-      (t) =>
+    .slice(0, 50)
+    .map((t) => {
+      const parts: string[] = [
         `- [${t.completed ? "x" : " "}] ${t.title} (${t.priority}${t.due_date ? `, due ${t.due_date}` : ""})`,
-    )
+      ];
+      if (t.description?.trim()) {
+        const snippet = t.description.trim().slice(0, 180);
+        parts.push(
+          `  Description: ${snippet}${t.description.trim().length > 180 ? "…" : ""}`,
+        );
+      }
+      return parts.join("\n");
+    })
     .join("\n");
 
   const noteLines = context.notes
-    .slice(0, 20)
-    .map((n) => `- ${n.title}`)
+    .slice(0, 30)
+    .map((n) => {
+      const lines: string[] = [`- ${n.title}`];
+      if (n.content?.trim()) {
+        const snippet = n.content.trim().slice(0, 220);
+        lines.push(
+          `  Content: ${snippet}${n.content.trim().length > 220 ? "…" : ""}`,
+        );
+      }
+      return lines.join("\n");
+    })
     .join("\n");
 
+  const meetingLines: string[] = [];
+  if (context.meetingSessions) {
+    const { active, completed } = context.meetingSessions;
+    if (active) {
+      meetingLines.push("Active meeting session:");
+      meetingLines.push(`  Title: ${active.title}`);
+      meetingLines.push(`  Started: ${active.startedAt}`);
+      if (active.entries.length > 0) {
+        meetingLines.push(
+          `  Notes captured so far (${active.entries.length}):`,
+        );
+        active.entries.slice(-20).forEach((e, i) => {
+          meetingLines.push(`    ${i + 1}. ${e.content}`);
+        });
+      } else {
+        meetingLines.push("  No notes captured yet.");
+      }
+    } else {
+      meetingLines.push("No active meeting session.");
+    }
+
+    if (completed.length > 0) {
+      meetingLines.push(
+        `\nPast meeting sessions (${completed.length} total, most recent first):`,
+      );
+      completed.slice(0, 8).forEach((s) => {
+        const parts: string[] = [
+          `  - "${s.title}"${s.endedAt ? ` (ended ${s.endedAt.slice(0, 10)})` : ""}`,
+        ];
+        if (s.artifactNote) parts.push(`    → Note: "${s.artifactNote}"`);
+        if (s.artifactTask) parts.push(`    → Task: "${s.artifactTask}"`);
+        meetingLines.push(parts.join("\n"));
+      });
+    } else {
+      meetingLines.push("No past meeting sessions.");
+    }
+  }
+
   return [
-    "You are Luna, the smart and friendly AI assistant built into Orbit — a personal productivity app for managing tasks and notes.",
+    `You are Luna, the smart and friendly AI assistant built into Orbit — a personal productivity app for managing tasks, notes, and meetings. Today's date is ${now.slice(0, 10)}.`,
     "",
     "Your capabilities:",
-    "- Answer questions about the user's tasks, notes, priorities, and schedule",
+    "- Answer questions about the user's tasks, notes, priorities, schedule, and meeting sessions",
     "- Create new tasks and notes using the provided tool functions",
     "- Give productivity advice: help prioritize, suggest time management strategies, break down large goals",
     "- Summarize, analyze, and find patterns across the user's data",
     "- Help with brainstorming, planning, and organizing ideas",
+    "- Discuss past and active meeting sessions — their notes, outcomes, and follow-ups",
     "- Chat freely on any topic the user brings up",
     "",
     "Guidelines:",
@@ -716,9 +788,16 @@ export function buildLunaSystemPrompt(context: {
     "- If the user's request is ambiguous, ask a clarifying question rather than guessing.",
     "- Be warm and encouraging but not overly verbose.",
     "",
-    `The user currently has ${context.tasks.length} task(s) and ${context.notes.length} note(s).`,
-    context.tasks.length > 0 ? `\nCurrent tasks:\n${taskLines}` : "",
-    context.notes.length > 0 ? `\nCurrent notes:\n${noteLines}` : "",
+    `The user currently has ${context.tasks.filter((t) => !t.completed).length} open task(s), ${context.tasks.filter((t) => t.completed).length} completed task(s), and ${context.notes.length} note(s).`,
+    context.tasks.length > 0
+      ? `\nTasks (open first, then completed):\n${taskLines}`
+      : "",
+    context.notes.length > 0
+      ? `\nNotes (most recently updated first):\n${noteLines}`
+      : "",
+    meetingLines.length > 0
+      ? `\nMeeting Mode:\n${meetingLines.join("\n")}`
+      : "",
   ]
     .filter(Boolean)
     .join("\n");

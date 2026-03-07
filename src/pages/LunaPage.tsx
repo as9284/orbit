@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { useTasksApi, useNotesApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
+import { useMeetingSessions } from "../hooks/useMeetingSessions";
+
 import {
   hasApiKey,
   isFeatureReady,
@@ -59,9 +61,12 @@ function nextId() {
 const CHAT_STORAGE_PREFIX = "orbit:luna:chat";
 
 export function LunaPage() {
-  const { user } = useAuth();
+  const { user, encryptionKey } = useAuth();
   const tasksApi = useTasksApi();
   const notesApi = useNotesApi();
+  const { activeSession, sessions: meetingSessions } = useMeetingSessions(
+    user?.id,
+  );
 
   const chatStorageKey = `${CHAT_STORAGE_PREFIX}:${user?.id ?? "_"}`;
 
@@ -117,6 +122,14 @@ export function LunaPage() {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Ensure tasks and notes are loaded when Luna is opened directly
+  // (they are lazy-loaded by their respective pages otherwise)
+  useEffect(() => {
+    if (!encryptionKey) return;
+    if (tasksApi.activeTasks.length === 0) tasksApi.fetchActiveTasks();
+    if (notesApi.notes.length === 0) void notesApi.fetchNotes();
+  }, [encryptionKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -255,11 +268,34 @@ export function LunaPage() {
           content: buildLunaSystemPrompt({
             tasks: tasksApi.activeTasks.map((t) => ({
               title: t.title,
+              description: t.description,
               priority: t.priority,
               due_date: t.due_date,
               completed: t.completed,
             })),
-            notes: notesApi.notes.map((n) => ({ title: n.title })),
+            notes: notesApi.notes.map((n) => ({
+              title: n.title,
+              content: n.content,
+              updated_at: n.updated_at,
+            })),
+            meetingSessions: {
+              active: activeSession
+                ? {
+                    title: activeSession.title,
+                    startedAt: activeSession.startedAt,
+                    entries: activeSession.entries.map((e) => ({
+                      content: e.content,
+                      createdAt: e.createdAt,
+                    })),
+                  }
+                : null,
+              completed: meetingSessions.map((s) => ({
+                title: s.title,
+                endedAt: s.endedAt,
+                artifactNote: s.artifacts?.note.title ?? null,
+                artifactTask: s.artifacts?.task.title ?? null,
+              })),
+            },
           }),
         },
         // Include previous conversation (excluding pending/tool metadata)
