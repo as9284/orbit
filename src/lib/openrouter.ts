@@ -67,6 +67,7 @@ export interface CacheInfo {
 export interface StreamCallbacks {
   onToken: (token: string) => void;
   onReasoningToken?: (token: string) => void;
+  onThinkingFallback?: () => void;
   onToolCall: (
     name: string,
     args: Record<string, unknown>,
@@ -567,6 +568,20 @@ export interface StreamLunaChatOptions {
   thinkingEnabled?: boolean;
 }
 
+function shouldRetryWithoutThinking(status: number, bodyText: string): boolean {
+  if (!bodyText) return false;
+  if (status !== 400 && status !== 422) return false;
+
+  const normalized = bodyText.toLowerCase();
+  return (
+    normalized.includes("thinking") ||
+    normalized.includes("reasoning") ||
+    normalized.includes("unsupported") ||
+    normalized.includes("invalid_parameter") ||
+    normalized.includes("max_tokens")
+  );
+}
+
 export async function streamLunaChat(
   messages: ChatMessage[],
   _apiKey: string,
@@ -616,6 +631,8 @@ export async function streamLunaChat(
       let accumText = "";
       let accumReasoning = "";
       let modelFailed = false;
+      let allowThinking = thinkingEnabled;
+      let announcedThinkingFallback = false;
 
       // Agentic loop: keep going until model responds with text (no tool calls)
       // or we hit the round cap. Each round may call tools and loop back.
@@ -627,7 +644,7 @@ export async function streamLunaChat(
           stream: true,
         };
 
-        if (thinkingEnabled) {
+        if (allowThinking) {
           // Thinking mode: no temperature/top_p, higher max_tokens for CoT
           body.thinking = { type: "enabled" };
           body.max_tokens = 8192;
@@ -648,6 +665,19 @@ export async function streamLunaChat(
 
         if (!res.ok) {
           const errText = await res.text();
+          if (
+            isDeepSeek &&
+            allowThinking &&
+            shouldRetryWithoutThinking(res.status, errText)
+          ) {
+            allowThinking = false;
+            if (!announcedThinkingFallback) {
+              callbacks.onThinkingFallback?.();
+              announcedThinkingFallback = true;
+            }
+            round -= 1;
+            continue;
+          }
           if (res.status === 400 && errText.includes("stream")) {
             return await nonStreamingFallback(
               messages,
@@ -656,7 +686,7 @@ export async function streamLunaChat(
               model,
               callbacks,
               signal,
-              options?.thinkingEnabled,
+              allowThinking,
             );
           }
           modelFailed = true;
@@ -871,16 +901,38 @@ async function nonStreamingFallback(
   }));
   let accumText = "";
   let accumReasoning = "";
+  let allowThinking = !!thinkingEnabled;
+  let announcedThinkingFallback = false;
 
   for (let round = 0; round < 5; round++) {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers,
-      body: JSON.stringify(buildBody(currentMessages)),
+      body: JSON.stringify(
+        (() => {
+          const body = buildBody(currentMessages);
+          if (!allowThinking) {
+            delete body.thinking;
+            body.temperature = 0.5;
+            body.max_tokens = 1024;
+          }
+          return body;
+        })(),
+      ),
       signal,
     });
 
     if (!res.ok) {
+      const errText = await res.text();
+      if (allowThinking && shouldRetryWithoutThinking(res.status, errText)) {
+        allowThinking = false;
+        if (!announcedThinkingFallback) {
+          callbacks.onThinkingFallback?.();
+          announcedThinkingFallback = true;
+        }
+        round -= 1;
+        continue;
+      }
       if (accumText || accumReasoning) {
         callbacks.onDone(accumText, accumReasoning || undefined);
         return model;

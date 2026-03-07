@@ -39,6 +39,7 @@ interface UIMessage {
   role: "user" | "assistant";
   content: string;
   reasoning?: string;
+  thinkingFallback?: boolean;
   pending?: boolean;
   toolResults?: ToolResult[];
   cacheInfo?: CacheInfo;
@@ -85,6 +86,7 @@ export function LunaPage() {
   const abortRef = useRef<AbortController | null>(null);
   const activeAssistantMessageIdRef = useRef<string | null>(null);
   const activeAssistantHasOutputRef = useRef(false);
+  const thinkingFallbackRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -136,6 +138,7 @@ export function LunaPage() {
         id,
         role: "assistant",
         content: "",
+        thinkingFallback: thinkingFallbackRef.current,
         pending: true,
       },
     ]);
@@ -201,6 +204,12 @@ export function LunaPage() {
     [scrollToBottom],
   );
 
+  const waitForNextPaint = useCallback(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    [],
+  );
+
   const handleSend = useCallback(
     async (e?: FormEvent) => {
       e?.preventDefault();
@@ -227,11 +236,13 @@ export function LunaPage() {
         id: nextId(),
         role: "assistant",
         content: "",
+        thinkingFallback: false,
         pending: true,
       };
 
       activeAssistantMessageIdRef.current = assistantMsg.id;
       activeAssistantHasOutputRef.current = false;
+      thinkingFallbackRef.current = false;
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setInput("");
@@ -299,6 +310,15 @@ export function LunaPage() {
               ),
             );
           },
+          onThinkingFallback: () => {
+            thinkingFallbackRef.current = true;
+            const activeId = ensureActiveAssistantMessage();
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === activeId ? { ...m, thinkingFallback: true } : m,
+              ),
+            );
+          },
           onToolCall: async (name, args) => {
             closeActiveAssistantMessage();
 
@@ -322,6 +342,7 @@ export function LunaPage() {
                 "create_task",
                 `Creating task: ${title}`,
               );
+              await waitForNextPaint();
 
               const taskId = await tasksApi.createTask({
                 title,
@@ -352,6 +373,7 @@ export function LunaPage() {
                 "create_note",
                 `Making note: ${title}`,
               );
+              await waitForNextPaint();
               const noteId = await notesApi.createNote({
                 title,
                 content,
@@ -389,6 +411,7 @@ export function LunaPage() {
             }
             activeAssistantMessageIdRef.current = null;
             activeAssistantHasOutputRef.current = false;
+            thinkingFallbackRef.current = false;
             setStreaming(false);
             abortRef.current = null;
             scrollToBottom();
@@ -419,6 +442,7 @@ export function LunaPage() {
             }
             activeAssistantMessageIdRef.current = null;
             activeAssistantHasOutputRef.current = false;
+            thinkingFallbackRef.current = false;
             setStreaming(false);
             abortRef.current = null;
           },
@@ -428,6 +452,8 @@ export function LunaPage() {
       );
     },
     [
+      closeActiveAssistantMessage,
+      createToolStatusMessage,
       input,
       streaming,
       messages,
@@ -435,6 +461,8 @@ export function LunaPage() {
       notesApi,
       scrollToBottom,
       thinkingMode,
+      updateToolStatusMessage,
+      waitForNextPaint,
     ],
   );
 
@@ -443,6 +471,7 @@ export function LunaPage() {
     abortRef.current = null;
     activeAssistantMessageIdRef.current = null;
     activeAssistantHasOutputRef.current = false;
+    thinkingFallbackRef.current = false;
     setStreaming(false);
     setMessages((prev) =>
       prev.map((m) => (m.pending ? { ...m, pending: false } : m)),
@@ -604,6 +633,15 @@ function MessageBubble({ message }: { message: UIMessage }) {
       <div
         className={`min-w-0 max-w-[85%] sm:max-w-[75%] ${isUser ? "order-first" : ""}`}
       >
+        {!isUser && message.thinkingFallback && (
+          <div className="mb-2">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/15 bg-amber-500/7 px-3 py-1.5 text-[11px] font-medium text-amber-300/80">
+              <Sparkles size={11} />
+              Thinking mode unavailable, retried without it
+            </span>
+          </div>
+        )}
+
         {/* Reasoning (thinking) collapsible */}
         {!isUser && message.reasoning && (
           <div className="mb-2">
