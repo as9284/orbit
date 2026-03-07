@@ -193,7 +193,11 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
 
   return (
     <Modal open={open} onClose={handleClose} title="New task">
-      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="space-y-4 sm:space-y-5"
+      >
         {/* Title */}
         <div>
           <input
@@ -219,7 +223,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
 
         {/* Description */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2 text-white/30">
+          <div className="flex flex-wrap items-center gap-1.5 mb-2 text-white/30">
             <AlignLeft size={12} />
             <span className="text-[10px] font-semibold uppercase tracking-widest">
               Description
@@ -315,7 +319,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
               })}
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               placeholder="Add a sub-task…"
@@ -334,7 +338,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
               type="button"
               onClick={addSubTask}
               disabled={!newSubTask.trim()}
-              className="px-3 py-2 rounded-lg border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/6 disabled:opacity-30 disabled:cursor-default transition-all"
+              className="px-3 py-2 rounded-lg border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/6 disabled:opacity-30 disabled:cursor-default transition-all sm:w-auto w-full"
               aria-label="Add sub-task"
             >
               <Plus size={14} />
@@ -350,7 +354,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
               Priority
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {PRIORITIES.map((p) => (
               <button
                 key={p.value}
@@ -389,7 +393,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2.5 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
           <button
             type="button"
             onClick={handleClose}

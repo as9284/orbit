@@ -253,7 +253,11 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
 
   return (
     <Modal open={!!task} onClose={onClose} title="Edit task">
-      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="space-y-4 sm:space-y-5"
+      >
         {/* Title */}
         <div>
           <input
@@ -279,7 +283,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
 
         {/* Description */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2 text-white/30">
+          <div className="flex flex-wrap items-center gap-1.5 mb-2 text-white/30">
             <AlignLeft size={12} />
             <span className="text-[10px] font-semibold uppercase tracking-widest">
               Description
@@ -301,7 +305,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
 
         {/* Sub-tasks */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2 text-white/30">
+          <div className="flex flex-wrap items-center gap-1.5 mb-2 text-white/30">
             <ListChecks size={12} />
             <span className="text-[10px] font-semibold uppercase tracking-widest">
               Sub-tasks
@@ -405,7 +409,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
                       </div>
 
                       <span
-                        className={`flex-1 min-w-0 text-sm break-words transition-all duration-200 ${
+                        className={`flex-1 min-w-0 text-sm wrap-break-word transition-all duration-200 ${
                           st.completed
                             ? "line-through text-white/25"
                             : "text-white/70"
@@ -434,7 +438,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
               })}
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               placeholder="Add a sub-task…"
@@ -453,7 +457,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
               type="button"
               onClick={addSubTask}
               disabled={!newSubTask.trim()}
-              className="px-3 py-2 rounded-lg border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/6 disabled:opacity-30 disabled:cursor-default transition-all"
+              className="px-3 py-2 rounded-lg border border-white/8 text-white/40 hover:text-white/70 hover:bg-white/6 disabled:opacity-30 disabled:cursor-default transition-all sm:w-auto w-full"
               aria-label="Add sub-task"
             >
               <Plus size={14} />
@@ -469,7 +473,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
               Priority
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {PRIORITIES.map((p) => (
               <button
                 key={p.value}
@@ -501,7 +505,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2.5 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
           <button
             type="button"
             onClick={onClose}

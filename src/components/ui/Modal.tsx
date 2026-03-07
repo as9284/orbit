@@ -22,7 +22,7 @@ export function Modal({
   maxWidth = "max-w-lg",
   closeOnEscape = true,
   closeOnOverlayClick = true,
-  zIndexClassName = "z-50",
+  zIndexClassName = "z-[80]",
   backdropClassName = "",
   panelClassName = "",
 }: ModalProps) {
@@ -135,7 +135,7 @@ export function Modal({
 
   return (
     <div
-      className={`fixed inset-0 ${zIndexClassName} flex items-end sm:items-center justify-center sm:p-4`}
+      className={`fixed inset-0 ${zIndexClassName} flex items-end justify-center p-0 sm:items-center sm:p-4 md:p-6`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -151,7 +151,7 @@ export function Modal({
       {/* Panel */}
       <div
         ref={panelRef}
-        className={`relative w-full ${maxWidth} bg-orbit-800 border border-white/9 rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/60 max-h-[92dvh] flex flex-col transition-all duration-200 ease-out ${panelClassName} ${
+        className={`relative mx-auto h-[100dvh] max-h-[100dvh] w-full ${maxWidth} bg-orbit-800 border border-white/9 border-x-0 border-b-0 rounded-none shadow-2xl shadow-black/60 sm:h-auto sm:max-h-[92dvh] sm:border-x sm:border-b sm:rounded-2xl flex flex-col overflow-hidden transition-all duration-200 ease-out ${panelClassName} ${
           visible
             ? "opacity-100 scale-100 translate-y-0"
             : "opacity-0 scale-[0.96] translate-y-3"
@@ -161,10 +161,10 @@ export function Modal({
         {/* Top glow accent */}
         <div className="absolute -top-px left-1/5 right-1/5 h-px bg-linear-to-r from-transparent via-violet-400/25 to-transparent" />
 
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/6 shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-[calc(0.875rem+env(safe-area-inset-top))] sm:py-4 border-b border-white/6 shrink-0">
           <h2
             id="modal-title"
-            className="text-sm font-semibold text-white/90 tracking-tight"
+            className="text-sm sm:text-[15px] font-semibold text-white/90 tracking-tight truncate"
           >
             {title}
           </h2>
@@ -176,7 +176,7 @@ export function Modal({
             <X size={15} />
           </button>
         </div>
-        <div className="p-5 sm:p-6 overflow-y-auto flex-1 min-h-0 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6">
+        <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain flex-1 min-h-0 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-6">
           {children}
         </div>
       </div>

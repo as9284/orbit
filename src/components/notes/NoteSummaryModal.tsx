@@ -41,7 +41,7 @@ export function NoteSummaryModal({ open, note, summary, onClose }: Props) {
       onClose={onClose}
       title="Luna summary"
       maxWidth="max-w-2xl"
-      zIndexClassName="z-[70]"
+      zIndexClassName="z-[90]"
       backdropClassName="bg-slate-950/55 backdrop-blur-md"
       panelClassName="overflow-hidden border-cyan-400/18 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.16),_transparent_42%),linear-gradient(180deg,_rgba(15,23,42,0.98),_rgba(8,15,31,0.98))] shadow-[0_30px_90px_rgba(2,6,23,0.78)]"
     >

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText, Pencil, Sparkles } from "lucide-react";
+import { FileText, ListTodo, Pencil, Sparkles } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Modal } from "../ui/Modal";
 import { Spinner } from "../ui/Spinner";
@@ -37,16 +37,22 @@ export function NotePreviewModal({
   const actionButtons = [
     {
       key: "summarize",
-      label: "Summarize",
+      label: "Summary",
       hint: "Generate a concise AI summary",
       busy: summarizing,
+      icon: Sparkles,
+      className:
+        "border-cyan-300/18 bg-cyan-500/6 text-cyan-50 hover:bg-cyan-500/12 hover:border-cyan-200/35",
       onClick: () => displayNote && onSummarize(displayNote),
     },
     {
       key: "convert",
-      label: "To task",
+      label: "Task",
       hint: "Turn this note into a task draft",
       busy: converting,
+      icon: ListTodo,
+      className:
+        "border-violet-300/20 bg-violet-500/8 text-violet-50 hover:bg-violet-500/14 hover:border-violet-200/35",
       onClick: () => displayNote && onConvert(displayNote),
     },
   ];
@@ -62,7 +68,7 @@ export function NotePreviewModal({
     >
       {displayNote && (
         <div className="space-y-5">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-3 min-w-0">
               <FileText
                 size={18}
@@ -73,7 +79,7 @@ export function NotePreviewModal({
               </h3>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2 shrink-0">
               {actionButtons.map((action) => (
                 <div key={action.key} className="group relative">
                   <button
@@ -81,16 +87,17 @@ export function NotePreviewModal({
                     disabled={action.busy}
                     onClick={action.onClick}
                     aria-label={action.hint}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/18 bg-cyan-500/6 px-3 py-1.5 text-[11px] font-semibold text-cyan-50 hover:bg-cyan-500/12 hover:border-cyan-200/35 transition-all duration-150 disabled:opacity-60 disabled:cursor-wait focus-ring"
+                    title={action.hint}
+                    className={`w-full inline-flex items-center justify-center gap-1.5 rounded-xl sm:rounded-full border px-3 py-2 sm:py-1.5 text-[11px] font-semibold transition-all duration-150 disabled:opacity-60 disabled:cursor-wait focus-ring ${action.className}`}
                   >
                     {action.busy ? (
                       <Spinner size={11} />
                     ) : (
-                      <Sparkles size={11} />
+                      <action.icon size={12} />
                     )}
-                    <span className="hidden sm:inline">{action.label}</span>
+                    <span>{action.label}</span>
                   </button>
-                  <span className="pointer-events-none absolute top-[calc(100%+8px)] right-0 rounded-lg border border-white/10 bg-orbit-800 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-white/85 shadow-xl shadow-black/50 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:translate-y-0 transition-all duration-150 z-10">
+                  <span className="pointer-events-none absolute top-[calc(100%+8px)] right-0 hidden sm:block rounded-lg border border-white/10 bg-orbit-800 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-white/85 shadow-xl shadow-black/50 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:translate-y-0 transition-all duration-150 z-10">
                     {action.hint}
                   </span>
                 </div>

@@ -44,7 +44,11 @@ export function CreateNoteModal({ open, onClose, onCreate }: Props) {
 
   return (
     <Modal open={open} onClose={handleClose} title="New note">
-      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="space-y-4 sm:space-y-5"
+      >
         <div>
           <input
             type="text"
@@ -74,7 +78,7 @@ export function CreateNoteModal({ open, onClose, onCreate }: Props) {
             maxLength={10000}
           />
         </div>
-        <div className="flex gap-2.5 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
           <button
             type="button"
             onClick={handleClose}
