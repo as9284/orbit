@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -133,7 +134,7 @@ export function Modal({
 
   if (!mounted) return null;
 
-  return (
+  return createPortal(
     <div
       className={`fixed inset-0 ${zIndexClassName} flex items-end justify-center p-0 sm:items-center sm:p-4 md:p-6`}
       role="dialog"
@@ -180,6 +181,7 @@ export function Modal({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
