@@ -227,7 +227,7 @@ export function MobileNav() {
               </button>
             </div>
 
-            <div className="mt-8 flex-1 space-y-3">
+            <div className="mt-8 flex-1 space-y-3 overflow-y-auto">
               {NAV.map(({ icon: Icon, label, to }) => (
                 <NavLink
                   key={to}
