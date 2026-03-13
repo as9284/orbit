@@ -18,6 +18,10 @@ import {
   StickyNote,
   Sparkles,
   ChevronDown,
+  Archive,
+  PenLine,
+  Video,
+  RefreshCw,
 } from "lucide-react";
 import { useTasksApi, useNotesApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
@@ -31,8 +35,10 @@ import {
 import {
   buildLunaSystemPrompt,
   streamLunaChat,
+  processWriting,
   type ChatMessage,
   type CacheInfo,
+  type WritingMode,
 } from "../lib/openrouter";
 import { renderMarkdown } from "../lib/markdown";
 
@@ -64,9 +70,9 @@ export function LunaPage() {
   const { user, encryptionKey } = useAuth();
   const tasksApi = useTasksApi();
   const notesApi = useNotesApi();
-  const { activeSession, sessions: meetingSessions } = useMeetingSessions(
-    user?.id,
-  );
+  const meetingApi = useMeetingSessions(user?.id);
+  const { activeSession, sessions: meetingSessions } = meetingApi;
+  const userName: string = user?.user_metadata?.full_name ?? user?.email ?? "";
 
   const chatStorageKey = `${CHAT_STORAGE_PREFIX}:${user?.id ?? "_"}`;
 
@@ -427,6 +433,251 @@ export function LunaPage() {
                 : "Failed to create note";
             }
 
+            if (name === "archive_task") {
+              const taskTitle = String(args.task_title ?? "");
+              const match =
+                tasksApi.activeTasks.find(
+                  (t) => t.title.toLowerCase() === taskTitle.toLowerCase(),
+                ) ??
+                tasksApi.activeTasks.find((t) =>
+                  t.title.toLowerCase().includes(taskTitle.toLowerCase()),
+                );
+              if (!match) {
+                return `Could not find an active task matching "${taskTitle}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "archive_task",
+                `Archiving: ${match.title}`,
+              );
+              await waitForNextPaint();
+              const ok = await tasksApi.archiveTask(match.id);
+              updateToolStatusMessage(statusId, {
+                tool: "archive_task",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Archived task: ${match.title}`
+                  : "Failed to archive task",
+              });
+              if (ok) toast.success(`Task archived: ${match.title}`);
+              else toast.error("Failed to archive task");
+              return ok
+                ? `Task archived: "${match.title}"`
+                : "Failed to archive task";
+            }
+
+            if (name === "complete_task") {
+              const taskTitle = String(args.task_title ?? "");
+              const match =
+                tasksApi.activeTasks.find(
+                  (t) => t.title.toLowerCase() === taskTitle.toLowerCase(),
+                ) ??
+                tasksApi.activeTasks.find((t) =>
+                  t.title.toLowerCase().includes(taskTitle.toLowerCase()),
+                );
+              if (!match) {
+                return `Could not find an active task matching "${taskTitle}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "complete_task",
+                `Completing: ${match.title}`,
+              );
+              await waitForNextPaint();
+              const ok = await tasksApi.toggleComplete(match.id, true);
+              updateToolStatusMessage(statusId, {
+                tool: "complete_task",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Completed task: ${match.title}`
+                  : "Failed to complete task",
+              });
+              if (ok) toast.success(`Task completed: ${match.title}`);
+              else toast.error("Failed to complete task");
+              return ok
+                ? `Task marked complete: "${match.title}"`
+                : "Failed to complete task";
+            }
+
+            if (name === "delete_note") {
+              const noteTitle = String(args.note_title ?? "");
+              const match =
+                notesApi.notes.find(
+                  (n) => n.title.toLowerCase() === noteTitle.toLowerCase(),
+                ) ??
+                notesApi.notes.find((n) =>
+                  n.title.toLowerCase().includes(noteTitle.toLowerCase()),
+                );
+              if (!match) {
+                return `Could not find a note matching "${noteTitle}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "delete_note",
+                `Deleting note: ${match.title}`,
+              );
+              await waitForNextPaint();
+              const ok = await notesApi.deleteNote(match.id);
+              updateToolStatusMessage(statusId, {
+                tool: "delete_note",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Deleted note: ${match.title}`
+                  : "Failed to delete note",
+              });
+              if (ok) toast.success(`Note deleted: ${match.title}`);
+              else toast.error("Failed to delete note");
+              return ok
+                ? `Note deleted: "${match.title}"`
+                : "Failed to delete note";
+            }
+
+            if (name === "transform_text") {
+              const text = String(args.text ?? "");
+              const mode = String(args.mode ?? "improve") as WritingMode;
+              if (!text.trim()) return "No text provided to transform.";
+              const statusId = createToolStatusMessage(
+                "transform_text",
+                `Applying ${mode} transformation…`,
+              );
+              await waitForNextPaint();
+              const result = await processWriting(
+                text,
+                mode,
+                mode === "email" ? userName : undefined,
+              );
+              if (result.text) {
+                updateToolStatusMessage(statusId, {
+                  tool: "transform_text",
+                  status: "success",
+                  label: `Text transformed (${mode})`,
+                });
+                return `Transformed text:\n\n${result.text}`;
+              } else {
+                updateToolStatusMessage(statusId, {
+                  tool: "transform_text",
+                  status: "error",
+                  label: "Text transformation failed",
+                });
+                return result.error ?? "Failed to transform text.";
+              }
+            }
+
+            if (name === "start_meeting") {
+              const title = String(args.title ?? "Meeting");
+              if (meetingApi.activeSession) {
+                return `A meeting session is already active: "${meetingApi.activeSession.title}". End it first.`;
+              }
+              const statusId = createToolStatusMessage(
+                "start_meeting",
+                `Starting meeting: ${title}`,
+              );
+              await waitForNextPaint();
+              const session = meetingApi.startSession(title);
+              const ok = !!session;
+              updateToolStatusMessage(statusId, {
+                tool: "start_meeting",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Meeting started: ${title}`
+                  : "Failed to start meeting",
+              });
+              if (ok) toast.success(`Meeting started: ${title}`);
+              return ok
+                ? `Meeting session started: "${title}"`
+                : "Failed to start meeting session.";
+            }
+
+            if (name === "add_meeting_entry") {
+              const content = String(args.content ?? "");
+              if (!content.trim())
+                return "No content provided for meeting entry.";
+              if (!meetingApi.activeSession) {
+                return "No active meeting session. Start one first with start_meeting.";
+              }
+              const statusId = createToolStatusMessage(
+                "add_meeting_entry",
+                `Adding meeting entry…`,
+              );
+              await waitForNextPaint();
+              const ok = meetingApi.addEntry(content);
+              updateToolStatusMessage(statusId, {
+                tool: "add_meeting_entry",
+                status: ok ? "success" : "error",
+                label: ok ? "Meeting entry added" : "Failed to add entry",
+              });
+              return ok
+                ? `Meeting entry added: "${content.slice(0, 80)}${content.length > 80 ? "…" : ""}"`
+                : "Failed to add meeting entry.";
+            }
+
+            if (name === "end_meeting") {
+              if (!meetingApi.activeSession) {
+                return "No active meeting session to end.";
+              }
+              const title = meetingApi.activeSession.title;
+              const statusId = createToolStatusMessage(
+                "end_meeting",
+                `Ending meeting: ${title}`,
+              );
+              await waitForNextPaint();
+              const ok = meetingApi.discardActiveSession();
+              updateToolStatusMessage(statusId, {
+                tool: "end_meeting",
+                status: ok ? "success" : "error",
+                label: ok ? `Meeting ended: ${title}` : "Failed to end meeting",
+              });
+              if (ok) toast.success(`Meeting ended: ${title}`);
+              return ok
+                ? `Meeting session ended: "${title}"`
+                : "Failed to end meeting session.";
+            }
+
+            if (name === "recategorize_tasks") {
+              const statusId = createToolStatusMessage(
+                "recategorize_tasks",
+                "Regenerating task categories…",
+              );
+              await waitForNextPaint();
+              const userId = user!.id;
+              localStorage.removeItem(`orbit:categories:${userId}`);
+              window.dispatchEvent(
+                new CustomEvent("orbit:categories:cleared", {
+                  detail: { userId },
+                }),
+              );
+              await waitForNextPaint();
+              void tasksApi.backgroundCategorize(tasksApi.activeTasks);
+              updateToolStatusMessage(statusId, {
+                tool: "recategorize_tasks",
+                status: "success",
+                label: "Task categories cleared — regenerating in background",
+              });
+              toast.success("Task categories are being regenerated");
+              return "Task categories have been cleared and are being regenerated in the background.";
+            }
+
+            if (name === "recategorize_notes") {
+              const statusId = createToolStatusMessage(
+                "recategorize_notes",
+                "Regenerating note categories…",
+              );
+              await waitForNextPaint();
+              const userId = user!.id;
+              localStorage.removeItem(`orbit:note-categories:${userId}`);
+              window.dispatchEvent(
+                new CustomEvent("orbit:note-categories:cleared", {
+                  detail: { userId },
+                }),
+              );
+              await waitForNextPaint();
+              void notesApi.backgroundCategorize(notesApi.notes);
+              updateToolStatusMessage(statusId, {
+                tool: "recategorize_notes",
+                status: "success",
+                label: "Note categories cleared — regenerating in background",
+              });
+              toast.success("Note categories are being regenerated");
+              return "Note categories have been cleared and are being regenerated in the background.";
+            }
+
             return "Unknown tool";
           },
           onDone: (fullText, reasoning) => {
@@ -496,6 +747,11 @@ export function LunaPage() {
       messages,
       tasksApi,
       notesApi,
+      meetingApi,
+      activeSession,
+      meetingSessions,
+      userName,
+      user,
       scrollToBottom,
       thinkingMode,
       updateToolStatusMessage,
@@ -749,8 +1005,23 @@ function MessageBubble({ message }: { message: UIMessage }) {
               >
                 {tr.status === "pending" ? (
                   <LoaderCircle size={12} className="animate-spin" />
-                ) : tr.tool === "create_task" ? (
+                ) : tr.tool === "create_task" || tr.tool === "complete_task" ? (
                   <CheckCircle2 size={12} />
+                ) : tr.tool === "archive_task" ? (
+                  <Archive size={12} />
+                ) : tr.tool === "create_note" ? (
+                  <StickyNote size={12} />
+                ) : tr.tool === "delete_note" ? (
+                  <Trash2 size={12} />
+                ) : tr.tool === "transform_text" ? (
+                  <PenLine size={12} />
+                ) : tr.tool === "start_meeting" ||
+                  tr.tool === "add_meeting_entry" ||
+                  tr.tool === "end_meeting" ? (
+                  <Video size={12} />
+                ) : tr.tool === "recategorize_tasks" ||
+                  tr.tool === "recategorize_notes" ? (
+                  <RefreshCw size={12} />
                 ) : (
                   <StickyNote size={12} />
                 )}
@@ -803,8 +1074,12 @@ function EmptyChat({
           {[
             "What tasks should I focus on today?",
             "Create a task to review project docs",
+            "Archive all low-priority tasks",
+            "Start a meeting called Weekly Sync",
+            "Fix the grammar in this text: [paste here]",
+            "Regenerate all my task categories",
             "Summarize my current notes",
-            "Write a note with ideas for the weekend",
+            "Delete my note about the weekend",
           ].map((suggestion) => (
             <button
               key={suggestion}

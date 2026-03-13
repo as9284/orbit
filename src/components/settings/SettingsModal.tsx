@@ -653,8 +653,12 @@ function AITab() {
   const handleClearCategories = () => {
     const userId = user!.id;
     localStorage.removeItem(`orbit:categories:${userId}`);
+    localStorage.removeItem(`orbit:note-categories:${userId}`);
     window.dispatchEvent(
       new CustomEvent("orbit:categories:cleared", { detail: { userId } }),
+    );
+    window.dispatchEvent(
+      new CustomEvent("orbit:note-categories:cleared", { detail: { userId } }),
     );
     setCleared(true);
     setTimeout(() => setCleared(false), 3000);
@@ -781,8 +785,8 @@ function AITab() {
             },
             {
               key: "autoCategorize" as const,
-              label: "Auto-categorize tasks",
-              desc: "Luna automatically assigns a category to new tasks",
+              label: "Auto-categorize tasks & notes",
+              desc: "Luna automatically assigns a category to new tasks and notes",
             },
             {
               key: "noteTools" as const,
@@ -844,7 +848,7 @@ function AITab() {
             <InlineAlert
               color="emerald"
               icon={<CheckCircle2 size={13} />}
-              msg="All categories cleared. They will be re-generated the next time you open the dashboard."
+              msg="All categories cleared. They will be re-generated the next time you open the tasks and notes pages."
             />
           ) : (
             <div className="flex items-center justify-between">

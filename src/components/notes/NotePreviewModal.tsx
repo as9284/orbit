@@ -11,6 +11,7 @@ interface Props {
   converting: boolean;
   summarizing: boolean;
   summaryOpen: boolean;
+  aiEnabled: boolean;
   onClose: () => void;
   onEdit: (note: Note) => void;
   onConvert: (note: Note) => void;
@@ -22,6 +23,7 @@ export function NotePreviewModal({
   converting,
   summarizing,
   summaryOpen,
+  aiEnabled,
   onClose,
   onEdit,
   onConvert,
@@ -34,7 +36,7 @@ export function NotePreviewModal({
     setDisplayNote(note);
   }
 
-  const actionButtons = [
+  const allActionButtons = [
     {
       key: "summarize",
       label: "Summary",
@@ -56,6 +58,7 @@ export function NotePreviewModal({
       onClick: () => displayNote && onConvert(displayNote),
     },
   ];
+  const actionButtons = aiEnabled ? allActionButtons : [];
 
   return (
     <Modal

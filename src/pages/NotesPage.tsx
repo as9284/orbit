@@ -284,57 +284,58 @@ export function NotesPage() {
       )}
 
       {/* Category filter chips */}
-      {(uniqueCategories.length > 0 || api.isCategorizingBackground) && (
-        <div
-          className="flex items-center gap-2 flex-wrap mb-6 animate-fade-in"
-          style={{ animationDelay: "80ms" }}
-        >
-          <span className="flex items-center gap-1 text-[10px] text-white/25 font-semibold uppercase tracking-widest shrink-0">
-            <Tag size={10} />
-            Category
-            {api.isCategorizingBackground && (
-              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-pulse" />
-            )}
-          </span>
-          {uniqueCategories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() =>
-                setCategoryFilter(cat === categoryFilter ? null : cat)
-              }
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 border ${
-                categoryFilter === cat
-                  ? "bg-violet-500/20 text-violet-300 border-violet-500/30"
-                  : "bg-white/4 text-white/40 border-white/8 hover:text-white/65 hover:bg-white/7 hover:border-white/15"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-          {categoryFilter && (
-            <button
-              onClick={() => setCategoryFilter(null)}
-              className="flex items-center gap-1 text-[11px] text-white/25 hover:text-white/50 transition-colors"
-              aria-label="Clear category filter"
-            >
-              <X size={10} />
-              Clear
-            </button>
-          )}
-          {!api.isCategorizingBackground &&
-            isFeatureReady("autoCategorize") &&
-            api.notes.some((n) => !api.categories[n.id]) && (
+      {isFeatureReady("autoCategorize") &&
+        (uniqueCategories.length > 0 || api.isCategorizingBackground) && (
+          <div
+            className="flex items-center gap-2 flex-wrap mb-6 animate-fade-in"
+            style={{ animationDelay: "80ms" }}
+          >
+            <span className="flex items-center gap-1 text-[10px] text-white/25 font-semibold uppercase tracking-widest shrink-0">
+              <Tag size={10} />
+              Category
+              {api.isCategorizingBackground && (
+                <span className="ml-1 w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-pulse" />
+              )}
+            </span>
+            {uniqueCategories.map((cat) => (
               <button
-                onClick={() => void api.backgroundCategorize(api.notes)}
-                className="ml-auto flex items-center gap-1 text-[11px] text-white/25 hover:text-violet-400 transition-colors"
-                title="Categorise remaining notes"
+                key={cat}
+                onClick={() =>
+                  setCategoryFilter(cat === categoryFilter ? null : cat)
+                }
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 border ${
+                  categoryFilter === cat
+                    ? "bg-violet-500/20 text-violet-300 border-violet-500/30"
+                    : "bg-white/4 text-white/40 border-white/8 hover:text-white/65 hover:bg-white/7 hover:border-white/15"
+                }`}
               >
-                <Sparkles size={11} />
-                Categorise
+                {cat}
+              </button>
+            ))}
+            {categoryFilter && (
+              <button
+                onClick={() => setCategoryFilter(null)}
+                className="flex items-center gap-1 text-[11px] text-white/25 hover:text-white/50 transition-colors"
+                aria-label="Clear category filter"
+              >
+                <X size={10} />
+                Clear
               </button>
             )}
-        </div>
-      )}
+            {!api.isCategorizingBackground &&
+              isFeatureReady("autoCategorize") &&
+              api.notes.some((n) => !api.categories[n.id]) && (
+                <button
+                  onClick={() => void api.backgroundCategorize(api.notes)}
+                  className="ml-auto flex items-center gap-1 text-[11px] text-white/25 hover:text-violet-400 transition-colors"
+                  title="Categorise remaining notes"
+                >
+                  <Sparkles size={11} />
+                  Categorise
+                </button>
+              )}
+          </div>
+        )}
 
       {api.aiStatus && !api.aiStatus.startsWith("Luna via ") && (
         <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/6 px-3 py-2 text-xs text-amber-200/80">
@@ -379,6 +380,7 @@ export function NotesPage() {
                 note={note}
                 category={api.categories[note.id] ?? null}
                 converting={convertingNoteId === note.id}
+                aiEnabled={isFeatureReady("noteTools")}
                 onEdit={setEditNote}
                 onPreview={setPreviewNote}
                 onDelete={(id) => setDeleteId(id)}
@@ -406,6 +408,7 @@ export function NotesPage() {
         converting={previewNote?.id === convertingNoteId}
         summarizing={previewNote?.id === summarizingNoteId}
         summaryOpen={!!summaryNote && !!activeSummary}
+        aiEnabled={isFeatureReady("noteTools")}
         onClose={closePreview}
         onEdit={(n) => {
           closePreview();
@@ -456,6 +459,7 @@ function NoteCard({
   note,
   category,
   converting,
+  aiEnabled,
   onEdit,
   onPreview,
   onDelete,
@@ -464,6 +468,7 @@ function NoteCard({
   note: Note;
   category: string | null;
   converting: boolean;
+  aiEnabled: boolean;
   onEdit: (note: Note) => void;
   onPreview: (note: Note) => void;
   onDelete: (id: string) => void;
@@ -498,23 +503,25 @@ function NoteCard({
           {format(parseISO(note.updated_at), "MMM d, yyyy")}
         </span>
         <div className="flex items-center gap-1.5">
-          {category && (
+          {category && aiEnabled && (
             <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-violet-500/12 text-violet-300/70 border border-violet-400/15">
               {category}
             </span>
           )}
           <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onConvert(note);
-              }}
-              disabled={converting}
-              className="p-1.5 rounded-lg text-cyan-300/45 hover:text-cyan-200 hover:bg-cyan-500/10 transition-all disabled:opacity-60 disabled:cursor-wait"
-              aria-label="Convert note to task with Luna"
-            >
-              {converting ? <Spinner size={12} /> : <Sparkles size={12} />}
-            </button>
+            {aiEnabled && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onConvert(note);
+                }}
+                disabled={converting}
+                className="p-1.5 rounded-lg text-cyan-300/45 hover:text-cyan-200 hover:bg-cyan-500/10 transition-all disabled:opacity-60 disabled:cursor-wait"
+                aria-label="Convert note to task with Luna"
+              >
+                {converting ? <Spinner size={12} /> : <Sparkles size={12} />}
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();

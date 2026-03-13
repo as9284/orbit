@@ -733,6 +733,171 @@ const LUNA_TOOLS: LunaTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "archive_task",
+      description:
+        "Archive a task by its title, removing it from the active list. Use when the user asks to archive, dismiss, or put a task away.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_title: {
+            type: "string",
+            description:
+              "The exact title of the task to archive as shown in the task list",
+          },
+        },
+        required: ["task_title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "complete_task",
+      description:
+        "Mark a task as complete by its title. Use when the user says a task is done, finished, or completed.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_title: {
+            type: "string",
+            description: "The exact title of the task to mark as complete",
+          },
+        },
+        required: ["task_title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_note",
+      description:
+        "Permanently delete a note by its title. Only use when the user explicitly asks to delete or remove a note.",
+      parameters: {
+        type: "object",
+        properties: {
+          note_title: {
+            type: "string",
+            description:
+              "The exact title of the note to delete as shown in the notes list",
+          },
+        },
+        required: ["note_title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "transform_text",
+      description:
+        "Apply a writing assistant transformation to a piece of text. Returns the transformed text for you to present to the user. Available modes: improve (enhance clarity/quality), grammar (fix errors), rephrase (reword), formal (professional tone), casual (friendly tone), expand (add detail), shorten (make concise), bullets (convert to bullet list), continue (extend the writing), email (reformat as a formal email with greeting and signature).",
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "The text to transform",
+          },
+          mode: {
+            type: "string",
+            enum: [
+              "improve",
+              "grammar",
+              "rephrase",
+              "formal",
+              "casual",
+              "expand",
+              "shorten",
+              "bullets",
+              "continue",
+              "email",
+            ],
+            description: "The writing transformation to apply",
+          },
+        },
+        required: ["text", "mode"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "start_meeting",
+      description:
+        "Start a new meeting session. Use when the user wants to begin recording a meeting or start meeting mode.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "Title for the new meeting session",
+          },
+        },
+        required: ["title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "add_meeting_entry",
+      description:
+        "Add a note entry to the currently active meeting session. Use when the user dictates something to record during a meeting.",
+      parameters: {
+        type: "object",
+        properties: {
+          content: {
+            type: "string",
+            description: "The meeting note content to add",
+          },
+        },
+        required: ["content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "end_meeting",
+      description:
+        "Discard and close the current active meeting session. Use when the user wants to stop or cancel the meeting.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "recategorize_tasks",
+      description:
+        "Clear all existing task categories and regenerate them using AI. Use when the user asks to re-categorize, refresh, or regenerate task categories.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "recategorize_notes",
+      description:
+        "Clear all existing note categories and regenerate them using AI. Use when the user asks to re-categorize, refresh, or regenerate note categories.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 export function buildLunaSystemPrompt(context: {
@@ -833,7 +998,12 @@ export function buildLunaSystemPrompt(context: {
     "",
     "Your capabilities:",
     "- Answer questions about the user's tasks, notes, priorities, schedule, and meeting sessions",
-    "- Create new tasks and notes using the provided tool functions",
+    "- Create new tasks (with sub-tasks, priority, and due date) and notes using the provided tools",
+    "- Archive or mark tasks as complete using the provided tools",
+    "- Delete notes when explicitly asked",
+    "- Apply writing assistant transformations to any text (improve, fix grammar, rephrase, make formal/casual, expand, shorten, convert to bullets, continue writing, or format as email)",
+    "- Start a new meeting session, add entries to the active meeting, and end/discard it",
+    "- Clear and regenerate AI categories for tasks or notes",
     "- Give productivity advice: help prioritize, suggest time management strategies, break down large goals",
     "- Summarize, analyze, and find patterns across the user's data",
     "- Help with brainstorming, planning, and organizing ideas",
@@ -844,10 +1014,12 @@ export function buildLunaSystemPrompt(context: {
     "- Be concise but thorough. Use markdown formatting (bold, lists, headers) when it helps readability.",
     "- When creating tasks, write clear action-oriented titles starting with verbs. Set appropriate priorities and due dates when context allows.",
     "- When creating notes, use markdown formatting for the content body.",
+    "- For archive_task, complete_task, and delete_note, use the exact task/note title as it appears in the list below.",
+    "- For transform_text, call the tool with the user's text and the appropriate mode, then present the result in your reply.",
     "- If the user asks for multiple deliverables or actions in one message, complete all of them in the same turn before giving your final reply.",
     "- Use tools as many times as needed. Do not stop after the first tool call if the user asked for additional tasks, notes, or other creations.",
-    "- Before your final reply, verify that every explicit create, add, save, or schedule request from the latest user message has been handled.",
-    "- After using a tool, briefly confirm what was created.",
+    "- Before your final reply, verify that every explicit create, add, save, schedule, archive, complete, or delete request from the latest user message has been handled.",
+    "- After using a tool, briefly confirm what was done.",
     "- If the user's request is ambiguous, ask a clarifying question rather than guessing.",
     "- Be warm and encouraging but not overly verbose.",
     "",

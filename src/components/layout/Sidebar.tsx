@@ -13,20 +13,49 @@ import {
 import { useEffect, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { SettingsModal } from "../settings/SettingsModal";
+import { getAiSettings, type AiFeatures } from "../../lib/ai";
 
-const NAV = [
+const NAV: {
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  label: string;
+  to: string;
+  feature?: keyof AiFeatures;
+}[] = [
   { icon: ListTodo, label: "Tasks", to: "/" },
   { icon: StickyNote, label: "Notes", to: "/notes" },
-  { icon: MessagesSquare, label: "Meeting", to: "/meeting" },
-  { icon: BrainCircuit, label: "Luna", to: "/luna" },
-  { icon: PenLine, label: "Writing", to: "/writing" },
+  {
+    icon: MessagesSquare,
+    label: "Meeting",
+    to: "/meeting",
+    feature: "meetingMode",
+  },
+  { icon: BrainCircuit, label: "Luna", to: "/luna", feature: "lunaChat" },
+  {
+    icon: PenLine,
+    label: "Writing",
+    to: "/writing",
+    feature: "writingAssistant",
+  },
   { icon: Archive, label: "Archive", to: "/archive" },
 ];
 
+function useAiFeatures(): AiFeatures {
+  const [features, setFeatures] = useState(() => getAiSettings().features);
+  useEffect(() => {
+    const sync = () => setFeatures(getAiSettings().features);
+    window.addEventListener("orbit:ai:changed", sync);
+    return () => window.removeEventListener("orbit:ai:changed", sync);
+  }, []);
+  return features;
+}
+
 export function Sidebar() {
   const { user } = useAuth();
+  const features = useAiFeatures();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsKey, setSettingsKey] = useState(0);
+
+  const visibleNav = NAV.filter(({ feature }) => !feature || features[feature]);
 
   const openSettings = () => {
     setSettingsKey((k) => k + 1);
@@ -58,7 +87,7 @@ export function Sidebar() {
           role="navigation"
           aria-label="Main"
         >
-          {NAV.map(({ icon: Icon, label, to }) => (
+          {visibleNav.map(({ icon: Icon, label, to }) => (
             <NavLink
               key={to}
               to={to}
@@ -120,11 +149,14 @@ export function Sidebar() {
 
 export function MobileNav() {
   const { user } = useAuth();
+  const features = useAiFeatures();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsKey, setSettingsKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuMounted, setMenuMounted] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+
+  const visibleNav = NAV.filter(({ feature }) => !feature || features[feature]);
 
   const name: string = user?.user_metadata?.full_name ?? user?.email ?? "User";
   const initials = name
@@ -228,7 +260,7 @@ export function MobileNav() {
             </div>
 
             <div className="mt-8 flex-1 space-y-3 overflow-y-auto">
-              {NAV.map(({ icon: Icon, label, to }) => (
+              {visibleNav.map(({ icon: Icon, label, to }) => (
                 <NavLink
                   key={to}
                   to={to}
