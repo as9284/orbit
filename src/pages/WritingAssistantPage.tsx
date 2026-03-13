@@ -15,7 +15,6 @@ interface ModeOption {
   mode: WritingMode;
   label: string;
   description: string;
-  emoji: string;
 }
 
 const MODES: ModeOption[] = [
@@ -23,55 +22,42 @@ const MODES: ModeOption[] = [
     mode: "improve",
     label: "Improve",
     description: "Enhance clarity and quality",
-    emoji: "✨",
   },
   {
     mode: "grammar",
     label: "Fix Grammar",
     description: "Correct errors and polish",
-    emoji: "✏️",
   },
   {
     mode: "rephrase",
     label: "Rephrase",
     description: "Say it a different way",
-    emoji: "🔄",
   },
   {
     mode: "formal",
     label: "Make Formal",
     description: "Professional & polished tone",
-    emoji: "💼",
   },
   {
     mode: "casual",
     label: "Make Casual",
     description: "Friendly & conversational",
-    emoji: "😊",
   },
   {
     mode: "expand",
     label: "Expand",
     description: "Add more detail and context",
-    emoji: "📖",
   },
-  {
-    mode: "shorten",
-    label: "Shorten",
-    description: "Make it more concise",
-    emoji: "✂️",
-  },
+  { mode: "shorten", label: "Shorten", description: "Make it more concise" },
   {
     mode: "bullets",
     label: "Bullet Points",
     description: "Convert to a bullet list",
-    emoji: "📋",
   },
   {
     mode: "continue",
     label: "Continue",
     description: "Keep writing in the same style",
-    emoji: "➡️",
   },
 ];
 
@@ -173,19 +159,18 @@ export function WritingAssistantPage() {
               Mode
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {MODES.map(({ mode, label, description, emoji }) => (
+              {MODES.map(({ mode, label, description }) => (
                 <button
                   key={mode}
                   type="button"
                   title={description}
                   onClick={() => setActiveMode(mode)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 border ${
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-150 border ${
                     activeMode === mode
                       ? "bg-violet-500/18 border-violet-400/30 text-violet-300"
                       : "bg-white/3 border-white/7 text-white/45 hover:text-white/70 hover:bg-white/6 hover:border-white/12"
                   }`}
                 >
-                  <span>{emoji}</span>
                   {label}
                 </button>
               ))}
@@ -215,9 +200,6 @@ export function WritingAssistantPage() {
                 </>
               ) : (
                 <>
-                  <span>
-                    {MODES.find((m) => m.mode === activeMode)?.emoji}
-                  </span>
                   {MODES.find((m) => m.mode === activeMode)?.label}
                   <ArrowRight size={14} />
                 </>
