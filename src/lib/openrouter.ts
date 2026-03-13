@@ -1557,3 +1557,95 @@ export async function processWriting(
     error: result.error,
   };
 }
+
+// ── Project Summary ───────────────────────────────────────────────────────────
+
+export interface AiProjectSummary {
+  headline: string;
+  status: string;
+  suggestions: string[];
+  risks: string[];
+}
+
+export interface ProjectSummaryResult {
+  summary: AiProjectSummary | null;
+  model: string | null;
+  error: string | null;
+}
+
+function parseProjectSummary(
+  text: string,
+  name: string,
+): AiProjectSummary | null {
+  try {
+    const parsed = JSON.parse(
+      stripMarkdownCodeFence(text),
+    ) as Partial<AiProjectSummary>;
+    const headline = parsed.headline?.trim() || name;
+    const status = parsed.status?.trim();
+    if (!status) return null;
+    return {
+      headline,
+      status,
+      suggestions: coerceStringList(parsed.suggestions, 4),
+      risks: coerceStringList(parsed.risks, 3),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function generateProjectSummary(
+  name: string,
+  description: string,
+  deadline: string | null,
+  taskTitles: string[],
+  completedCount: number,
+  noteTitles: string[],
+): Promise<ProjectSummaryResult> {
+  const total = taskTitles.length;
+  const progress = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+
+  const prompt = [
+    "You are Luna, the AI assistant inside Orbit. Analyze this project and provide a concise, actionable brief.",
+    "Respond with raw JSON only. No markdown fences. No commentary outside the JSON.",
+    "",
+    'Required JSON shape: {"headline":"string","status":"string","suggestions":["string"],"risks":["string"]}',
+    "",
+    "Rules:",
+    "- headline: 4-8 words capturing the current project state (e.g. 'On track for Q3 delivery')",
+    "- status: 2-3 sentences describing progress, overall health, and notable highlights",
+    "- suggestions: 2-4 concrete, actionable next steps tailored to what has been done so far",
+    "- risks: 0-3 short risk items only when data suggests a real concern (deadline slippage, stalled tasks, etc.); return [] when there are no clear risks",
+    "- Be specific to the project data. Avoid filler and generic advice.",
+    "",
+    `Project name: ${name}`,
+    description ? `Description: ${description}` : "",
+    deadline ? `Deadline: ${deadline}` : "No deadline set.",
+    `Progress: ${completedCount} of ${total} tasks completed (${progress}%)`,
+    total > 0
+      ? `Task titles: ${taskTitles.slice(0, 10).join("; ")}`
+      : "No tasks linked yet.",
+    noteTitles.length > 0
+      ? `Related notes: ${noteTitles.slice(0, 5).join("; ")}`
+      : "No notes linked yet.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const result = await requestAiText(prompt, 500);
+  if (!result.text) {
+    return { summary: null, model: result.model, error: result.error };
+  }
+
+  const summary = parseProjectSummary(result.text, name);
+  if (!summary) {
+    return {
+      summary: null,
+      model: result.model,
+      error: `Luna returned an invalid project summary: ${result.text.slice(0, 180)}`,
+    };
+  }
+
+  return { summary, model: result.model, error: null };
+}

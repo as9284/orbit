@@ -200,3 +200,28 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Task = Database["public"]["Tables"]["tasks"]["Row"];
 export type SubTask = Database["public"]["Tables"]["sub_tasks"]["Row"];
 export type Note = Database["public"]["Tables"]["notes"]["Row"];
+
+// ── Project type (localStorage-backed) ───────────────────────────────────────
+
+export type ProjectColor =
+  | "violet"
+  | "blue"
+  | "emerald"
+  | "amber"
+  | "rose"
+  | "cyan"
+  | "orange"
+  | "pink";
+
+export interface Project {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  color: ProjectColor;
+  deadline: string | null;
+  taskIds: string[];
+  noteIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
