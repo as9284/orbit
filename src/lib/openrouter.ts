@@ -79,7 +79,8 @@ export type WritingMode =
   | "expand"
   | "shorten"
   | "bullets"
-  | "continue";
+  | "continue"
+  | "email";
 
 export interface WritingResult {
   text: string | null;
@@ -1315,21 +1316,23 @@ const WRITING_MODE_PROMPTS: Record<WritingMode, string> = {
     "Convert the following text into a clean, concise bullet-point list that captures all key ideas. Return only the bullet list with no explanations.",
   continue:
     "Continue writing the following text in the same style, tone, and voice. Add a natural continuation of roughly the same length. Return only the continuation (do not repeat the original) with no explanations.",
+  email:
+    "Reformat the following message into a complete, professionally structured email. Use a formal salutation (e.g. 'Dear [Recipient],' — if no recipient name is obvious, use 'Dear Sir/Madam,'), well-structured paragraphs with correct punctuation, and close with 'Kind regards,' followed by the sender name provided. Return only the formatted email with no explanations.",
 };
 
 export async function processWriting(
   text: string,
   mode: WritingMode,
+  userName?: string,
 ): Promise<WritingResult> {
-  const instruction = WRITING_MODE_PROMPTS[mode];
-  const prompt = [
-    instruction,
-    "",
-    "=== TEXT ===",
-    text.trim(),
-  ].join("\n");
+  let instruction = WRITING_MODE_PROMPTS[mode];
+  if (mode === "email" && userName) {
+    instruction = instruction.replace("the sender name provided", userName);
+  }
+  const prompt = [instruction, "", "=== TEXT ===", text.trim()].join("\n");
 
-  const maxTokens = mode === "expand" || mode === "continue" ? 800 : 600;
+  const maxTokens =
+    mode === "expand" || mode === "continue" || mode === "email" ? 800 : 600;
   const result = await requestAiText(prompt, maxTokens);
   return {
     text: result.text ?? null,

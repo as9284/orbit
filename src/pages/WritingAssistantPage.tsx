@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { isFeatureReady } from "../lib/ai";
 import { processWriting, type WritingMode } from "../lib/openrouter";
+import { useAuth } from "../contexts/AuthContext";
 
 interface ModeOption {
   mode: WritingMode;
@@ -59,9 +60,17 @@ const MODES: ModeOption[] = [
     label: "Continue",
     description: "Keep writing in the same style",
   },
+  {
+    mode: "email",
+    label: "Format as Email",
+    description:
+      "Reformat as a formal, professional email with greeting and signature",
+  },
 ];
 
 export function WritingAssistantPage() {
+  const { user } = useAuth();
+  const userName: string = user?.user_metadata?.full_name ?? user?.email ?? "";
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [activeMode, setActiveMode] = useState<WritingMode>("improve");
@@ -84,7 +93,11 @@ export function WritingAssistantPage() {
     setOutput("");
 
     try {
-      const result = await processWriting(input, activeMode);
+      const result = await processWriting(
+        input,
+        activeMode,
+        activeMode === "email" ? userName : undefined,
+      );
       if (!result.text) {
         toast.error(result.error ?? "Luna couldn't process your text");
         return;
