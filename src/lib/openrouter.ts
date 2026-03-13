@@ -1649,3 +1649,26 @@ export async function generateProjectSummary(
 
   return { summary, model: result.model, error: null };
 }
+
+// ── Project color generation ──────────────────────────────────────────────────
+
+export interface GenerateProjectColorResult {
+  color: string | null; // hex e.g. "#7c3aed"
+  error: string | null;
+}
+
+export async function generateProjectColor(
+  name: string,
+  description: string,
+): Promise<GenerateProjectColorResult> {
+  const prompt = `You are a design assistant. Generate a single, unique hex color to represent a project named "${name}"${description ? ` — "${description}"` : ""}.
+Rules: return ONLY the hex code (e.g. #7c3aed). Pick a vibrant, saturated color that fits the project theme. Dark-UI safe — avoid very bright or very dark colors. No explanations.`;
+
+  const result = await requestAiText(prompt, 10);
+  if (result.error) return { color: null, error: result.error };
+
+  const match = (result.text ?? "").match(/#[0-9a-fA-F]{6}/);
+  return match
+    ? { color: match[0].toLowerCase(), error: null }
+    : { color: null, error: "Luna couldn't generate a valid color." };
+}

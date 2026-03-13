@@ -33,29 +33,29 @@ const COLOR_CLASSES: Record<
     ring: "border-violet-500/25",
     glow: "shadow-violet-500/10",
   },
+  purple: {
+    dot: "bg-purple-500",
+    bar: "bg-purple-500/70",
+    ring: "border-purple-500/25",
+    glow: "shadow-purple-500/10",
+  },
+  indigo: {
+    dot: "bg-indigo-500",
+    bar: "bg-indigo-500/70",
+    ring: "border-indigo-500/25",
+    glow: "shadow-indigo-500/10",
+  },
   blue: {
     dot: "bg-blue-500",
     bar: "bg-blue-500/70",
     ring: "border-blue-500/25",
     glow: "shadow-blue-500/10",
   },
-  emerald: {
-    dot: "bg-emerald-500",
-    bar: "bg-emerald-500/70",
-    ring: "border-emerald-500/25",
-    glow: "shadow-emerald-500/10",
-  },
-  amber: {
-    dot: "bg-amber-500",
-    bar: "bg-amber-500/70",
-    ring: "border-amber-500/25",
-    glow: "shadow-amber-500/10",
-  },
-  rose: {
-    dot: "bg-rose-500",
-    bar: "bg-rose-500/70",
-    ring: "border-rose-500/25",
-    glow: "shadow-rose-500/10",
+  sky: {
+    dot: "bg-sky-500",
+    bar: "bg-sky-500/70",
+    ring: "border-sky-500/25",
+    glow: "shadow-sky-500/10",
   },
   cyan: {
     dot: "bg-cyan-500",
@@ -63,11 +63,47 @@ const COLOR_CLASSES: Record<
     ring: "border-cyan-500/25",
     glow: "shadow-cyan-500/10",
   },
+  teal: {
+    dot: "bg-teal-500",
+    bar: "bg-teal-500/70",
+    ring: "border-teal-500/25",
+    glow: "shadow-teal-500/10",
+  },
+  emerald: {
+    dot: "bg-emerald-500",
+    bar: "bg-emerald-500/70",
+    ring: "border-emerald-500/25",
+    glow: "shadow-emerald-500/10",
+  },
+  lime: {
+    dot: "bg-lime-500",
+    bar: "bg-lime-500/70",
+    ring: "border-lime-500/25",
+    glow: "shadow-lime-500/10",
+  },
+  amber: {
+    dot: "bg-amber-500",
+    bar: "bg-amber-500/70",
+    ring: "border-amber-500/25",
+    glow: "shadow-amber-500/10",
+  },
   orange: {
     dot: "bg-orange-500",
     bar: "bg-orange-500/70",
     ring: "border-orange-500/25",
     glow: "shadow-orange-500/10",
+  },
+  red: {
+    dot: "bg-red-500",
+    bar: "bg-red-500/70",
+    ring: "border-red-500/25",
+    glow: "shadow-red-500/10",
+  },
+  rose: {
+    dot: "bg-rose-500",
+    bar: "bg-rose-500/70",
+    ring: "border-rose-500/25",
+    glow: "shadow-rose-500/10",
   },
   pink: {
     dot: "bg-pink-500",
@@ -75,10 +111,19 @@ const COLOR_CLASSES: Record<
     ring: "border-pink-500/25",
     glow: "shadow-pink-500/10",
   },
+  fuchsia: {
+    dot: "bg-fuchsia-500",
+    bar: "bg-fuchsia-500/70",
+    ring: "border-fuchsia-500/25",
+    glow: "shadow-fuchsia-500/10",
+  },
 };
 
 function getColorClasses(color: string) {
-  return COLOR_CLASSES[color] ?? COLOR_CLASSES.violet;
+  if (color.startsWith("#")) {
+    return { dot: "", bar: "", ring: "border-white/10", glow: "", hex: color };
+  }
+  return { ...(COLOR_CLASSES[color] ?? COLOR_CLASSES.violet), hex: null };
 }
 
 // ── Page component ────────────────────────────────────────────────────────────
@@ -136,7 +181,7 @@ export function ProjectsPage() {
   return (
     <div className="min-h-screen px-4 sm:px-8 py-8 sm:py-10 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-8">
+      <div className="flex items-start justify-between gap-4 mb-8 animate-fade-in">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/25 mb-1">
             Orbit
@@ -150,7 +195,7 @@ export function ProjectsPage() {
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/80 hover:bg-violet-500 text-white text-sm font-medium transition-all shadow-lg shadow-violet-500/15"
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-b from-violet-500 to-violet-600 hover:from-violet-400 hover:to-violet-500 text-white text-sm font-medium transition-all shadow-lg shadow-violet-500/25 border border-violet-400/30 active:scale-95"
         >
           <Plus size={15} />
           <span className="hidden sm:inline">New project</span>
@@ -166,7 +211,7 @@ export function ProjectsPage() {
 
       {/* Empty state */}
       {!loading && projectsApi.projects.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="flex flex-col items-center justify-center py-24 text-center animate-slide-up">
           <div className="w-14 h-14 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-center mb-4">
             <FolderOpen size={24} className="text-white/20" />
           </div>
@@ -179,7 +224,7 @@ export function ProjectsPage() {
           </p>
           <button
             onClick={() => setCreateOpen(true)}
-            className="mt-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-500/80 hover:bg-violet-500 text-white text-sm font-medium transition-all"
+            className="mt-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-linear-to-b from-violet-500 to-violet-600 hover:from-violet-400 hover:to-violet-500 text-white text-sm font-medium transition-all shadow-lg shadow-violet-500/25 border border-violet-400/30 active:scale-95"
           >
             <Plus size={15} />
             New project
@@ -191,7 +236,7 @@ export function ProjectsPage() {
       {projectsApi.projects.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {enrichedProjects.map(
-            ({ project, completedCount, totalCount, progress }) => {
+            ({ project, completedCount, totalCount, progress }, index) => {
               const colors = getColorClasses(project.color);
               const isOverdue =
                 project.deadline &&
@@ -204,13 +249,27 @@ export function ProjectsPage() {
                 <div
                   key={project.id}
                   onClick={() => setDetailProject(project)}
-                  className={`group relative rounded-2xl border bg-white/3 hover:bg-white/5 cursor-pointer transition-all duration-200 p-5 shadow-lg ${colors.ring} ${colors.glow}`}
+                  style={{
+                    animationDelay: `${index * 60}ms`,
+                    ...(colors.hex
+                      ? {
+                          borderColor: `${colors.hex}40`,
+                          boxShadow: `0 4px 24px ${colors.hex}1a`,
+                        }
+                      : undefined),
+                  }}
+                  className={`group relative rounded-2xl border bg-white/3 hover:bg-white/5 cursor-pointer transition-all duration-200 p-5 shadow-lg animate-slide-up ${colors.ring} ${colors.glow}`}
                 >
                   {/* Color dot accent */}
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <span
                         className={`w-2.5 h-2.5 rounded-full shrink-0 ${colors.dot}`}
+                        style={
+                          colors.hex
+                            ? { backgroundColor: colors.hex }
+                            : undefined
+                        }
                       />
                       <h3 className="text-sm font-semibold text-white/85 truncate">
                         {project.name}
@@ -254,7 +313,15 @@ export function ProjectsPage() {
                       <div className="h-1.5 rounded-full bg-white/8 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${colors.bar}`}
-                          style={{ width: `${progress}%` }}
+                          style={
+                            colors.hex
+                              ? {
+                                  width: `${progress}%`,
+                                  backgroundColor: colors.hex,
+                                  opacity: 0.75,
+                                }
+                              : { width: `${progress}%` }
+                          }
                         />
                       </div>
                       <p className="mt-1 text-[11px] text-white/30 tabular-nums">

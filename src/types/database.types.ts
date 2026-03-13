@@ -203,15 +203,7 @@ export type Note = Database["public"]["Tables"]["notes"]["Row"];
 
 // ── Project type (localStorage-backed) ───────────────────────────────────────
 
-export type ProjectColor =
-  | "violet"
-  | "blue"
-  | "emerald"
-  | "amber"
-  | "rose"
-  | "cyan"
-  | "orange"
-  | "pink";
+export type ProjectColor = string;
 
 export interface Project {
   id: string;

@@ -42,6 +42,11 @@ const privateRouteMetadata: Record<string, Omit<RouteMeta, "robots">> = {
     title: "Archive | Orbit",
     description: "Browse completed work and archived history in Orbit.",
   },
+  "/projects": {
+    title: "Projects | Orbit",
+    description:
+      "Organize tasks, notes, and meetings into projects and track progress toward your goals in Orbit.",
+  },
 };
 
 function resolveRouteMeta(pathname: string, authState: AuthState): RouteMeta {

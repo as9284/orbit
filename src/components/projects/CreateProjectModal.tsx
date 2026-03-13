@@ -1,19 +1,9 @@
 import { useState } from "react";
 import { Modal } from "../ui/Modal";
 import { DatePicker } from "../ui/DatePicker";
+import { ColorPicker } from "./ColorPicker";
 import type { ProjectColor } from "../../types/database.types";
 import type { CreateProjectData } from "../../hooks/useProjects";
-
-const COLORS: { value: ProjectColor; label: string; classes: string }[] = [
-  { value: "violet", label: "Violet", classes: "bg-violet-500/80" },
-  { value: "blue", label: "Blue", classes: "bg-blue-500/80" },
-  { value: "emerald", label: "Emerald", classes: "bg-emerald-500/80" },
-  { value: "amber", label: "Amber", classes: "bg-amber-500/80" },
-  { value: "rose", label: "Rose", classes: "bg-rose-500/80" },
-  { value: "cyan", label: "Cyan", classes: "bg-cyan-500/80" },
-  { value: "orange", label: "Orange", classes: "bg-orange-500/80" },
-  { value: "pink", label: "Pink", classes: "bg-pink-500/80" },
-];
 
 interface CreateProjectModalProps {
   open: boolean;
@@ -97,26 +87,12 @@ export function CreateProjectModal({
         </div>
 
         {/* Color */}
-        <div>
-          <label className="block text-xs font-medium text-white/50 mb-2">
-            Color
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {COLORS.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                aria-label={c.label}
-                onClick={() => setColor(c.value)}
-                className={`w-7 h-7 rounded-full transition-all duration-150 ${c.classes} ${
-                  color === c.value
-                    ? "ring-2 ring-white/70 ring-offset-2 ring-offset-orbit-800 scale-110"
-                    : "opacity-60 hover:opacity-90"
-                }`}
-              />
-            ))}
-          </div>
-        </div>
+        <ColorPicker
+          value={color}
+          onChange={setColor}
+          projectName={name}
+          projectDescription={description}
+        />
 
         <div className="flex justify-end gap-2 pt-2">
           <button
