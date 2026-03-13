@@ -794,6 +794,11 @@ function AITab() {
               label: "Luna chat",
               desc: "Chat with Luna to manage tasks and get advice",
             },
+            {
+              key: "writingAssistant" as const,
+              label: "Writing Assistant",
+              desc: "AI-powered text improvement, grammar fixing, rephrasing, and more",
+            },
           ].map(({ key, label, desc }) => (
             <label
               key={key}
