@@ -70,6 +70,23 @@ export interface GenerateMeetingArtifactsResult {
   error: string | null;
 }
 
+export type WritingMode =
+  | "improve"
+  | "grammar"
+  | "rephrase"
+  | "formal"
+  | "casual"
+  | "expand"
+  | "shorten"
+  | "bullets"
+  | "continue";
+
+export interface WritingResult {
+  text: string | null;
+  model: string | null;
+  error: string | null;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
@@ -1275,4 +1292,48 @@ async function nonStreamingFallback(
 
   callbacks.onDone(accumText, accumReasoning || undefined);
   return model;
+}
+
+// ── Writing Assistant ─────────────────────────────────────────────────────────
+
+const WRITING_MODE_PROMPTS: Record<WritingMode, string> = {
+  improve:
+    "Improve the clarity, flow, and overall quality of the following text. Keep the original meaning and tone. Return only the improved text with no explanations.",
+  grammar:
+    "Fix all grammar, spelling, and punctuation errors in the following text. Keep the style and meaning intact. Return only the corrected text with no explanations.",
+  rephrase:
+    "Rephrase the following text to say the same thing in a different way. Preserve the meaning and intended audience. Return only the rephrased text with no explanations.",
+  formal:
+    "Rewrite the following text in a formal, professional tone suitable for business or academic contexts. Return only the rewritten text with no explanations.",
+  casual:
+    "Rewrite the following text in a friendly, conversational, and casual tone. Return only the rewritten text with no explanations.",
+  expand:
+    "Expand the following text with more detail, context, and supporting information while staying on topic. Return only the expanded text with no explanations.",
+  shorten:
+    "Shorten the following text significantly while preserving all key points and meaning. Remove filler and redundancy. Return only the shortened text with no explanations.",
+  bullets:
+    "Convert the following text into a clean, concise bullet-point list that captures all key ideas. Return only the bullet list with no explanations.",
+  continue:
+    "Continue writing the following text in the same style, tone, and voice. Add a natural continuation of roughly the same length. Return only the continuation (do not repeat the original) with no explanations.",
+};
+
+export async function processWriting(
+  text: string,
+  mode: WritingMode,
+): Promise<WritingResult> {
+  const instruction = WRITING_MODE_PROMPTS[mode];
+  const prompt = [
+    instruction,
+    "",
+    "=== TEXT ===",
+    text.trim(),
+  ].join("\n");
+
+  const maxTokens = mode === "expand" || mode === "continue" ? 800 : 600;
+  const result = await requestAiText(prompt, maxTokens);
+  return {
+    text: result.text ?? null,
+    model: result.model,
+    error: result.error,
+  };
 }

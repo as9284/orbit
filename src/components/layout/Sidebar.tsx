@@ -6,6 +6,7 @@ import {
   StickyNote,
   BrainCircuit,
   MessagesSquare,
+  PenLine,
   Menu,
   X,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const NAV = [
   { icon: StickyNote, label: "Notes", to: "/notes" },
   { icon: MessagesSquare, label: "Meeting", to: "/meeting" },
   { icon: BrainCircuit, label: "Luna", to: "/luna" },
+  { icon: PenLine, label: "Writing", to: "/writing" },
   { icon: Archive, label: "Archive", to: "/archive" },
 ];
 

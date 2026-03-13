@@ -40,6 +40,11 @@ const MeetingModePage = lazy(() =>
     default: module.MeetingModePage,
   })),
 );
+const WritingAssistantPage = lazy(() =>
+  import("./pages/WritingAssistantPage").then((module) => ({
+    default: module.WritingAssistantPage,
+  })),
+);
 
 function RouteFallback() {
   return (
@@ -86,6 +91,7 @@ function AppContent() {
             <Route path="notes" element={<NotesPage />} />
             <Route path="meeting" element={<MeetingModePage />} />
             <Route path="luna" element={<LunaPage />} />
+            <Route path="writing" element={<WritingAssistantPage />} />
             <Route path="archive" element={<ArchivePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

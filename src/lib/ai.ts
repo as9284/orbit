@@ -101,6 +101,8 @@ export interface AiFeatures {
   lunaChat: boolean;
   /** Meeting capture and AI wrap-up */
   meetingMode: boolean;
+  /** Writing assistant for text improvement and transformation */
+  writingAssistant: boolean;
 }
 
 const DEFAULT_FEATURES: AiFeatures = {
@@ -108,6 +110,7 @@ const DEFAULT_FEATURES: AiFeatures = {
   noteTools: false,
   lunaChat: false,
   meetingMode: false,
+  writingAssistant: false,
 };
 
 // ── Settings shape ───────────────────────────────────────────────────────────
