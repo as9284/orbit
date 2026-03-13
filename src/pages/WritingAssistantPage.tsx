@@ -126,7 +126,7 @@ export function WritingAssistantPage() {
     } finally {
       setLoading(false);
     }
-  }, [input, activeMode]);
+  }, [input, activeMode, userName]);
 
   const handleCopy = useCallback(async () => {
     if (!output) return;

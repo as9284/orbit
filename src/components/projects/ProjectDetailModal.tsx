@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -134,12 +134,17 @@ export function ProjectDetailModal({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  // Keep a stable "display" project so content stays visible during exit animation
-  const displayRef = useRef(project);
+  /* eslint-disable react-hooks/set-state-in-effect */
+  const [displayProject, setDisplayProject] = useState(project);
+
   useEffect(() => {
-    if (project) displayRef.current = project;
+    if (project) {
+      setDisplayProject(project);
+    }
   }, [project]);
-  const dp = project ?? displayRef.current;
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const dp = project ?? displayProject;
 
   const colors = dp ? getColorClasses(dp.color) : getColorClasses("");
 

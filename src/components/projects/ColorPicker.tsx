@@ -4,68 +4,7 @@ import { toast } from "react-hot-toast";
 import type { ProjectColor } from "../../types/database.types";
 import { hasApiKey } from "../../lib/ai";
 import { generateProjectColor } from "../../lib/openrouter";
-
-// ── Color palette ─────────────────────────────────────────────────────────────
-
-export const COLOR_OPTIONS: {
-  value: ProjectColor;
-  label: string;
-  bg: string;
-  ring: string;
-}[] = [
-  {
-    value: "violet",
-    label: "Violet",
-    bg: "bg-violet-500",
-    ring: "ring-violet-400",
-  },
-  {
-    value: "purple",
-    label: "Purple",
-    bg: "bg-purple-500",
-    ring: "ring-purple-400",
-  },
-  {
-    value: "indigo",
-    label: "Indigo",
-    bg: "bg-indigo-500",
-    ring: "ring-indigo-400",
-  },
-  { value: "blue", label: "Blue", bg: "bg-blue-500", ring: "ring-blue-400" },
-  { value: "sky", label: "Sky", bg: "bg-sky-500", ring: "ring-sky-400" },
-  { value: "cyan", label: "Cyan", bg: "bg-cyan-500", ring: "ring-cyan-400" },
-  { value: "teal", label: "Teal", bg: "bg-teal-500", ring: "ring-teal-400" },
-  {
-    value: "emerald",
-    label: "Emerald",
-    bg: "bg-emerald-500",
-    ring: "ring-emerald-400",
-  },
-  { value: "lime", label: "Lime", bg: "bg-lime-500", ring: "ring-lime-400" },
-  {
-    value: "amber",
-    label: "Amber",
-    bg: "bg-amber-500",
-    ring: "ring-amber-400",
-  },
-  {
-    value: "orange",
-    label: "Orange",
-    bg: "bg-orange-500",
-    ring: "ring-orange-400",
-  },
-  { value: "red", label: "Red", bg: "bg-red-500", ring: "ring-red-400" },
-  { value: "rose", label: "Rose", bg: "bg-rose-500", ring: "ring-rose-400" },
-  { value: "pink", label: "Pink", bg: "bg-pink-500", ring: "ring-pink-400" },
-  {
-    value: "fuchsia",
-    label: "Fuchsia",
-    bg: "bg-fuchsia-500",
-    ring: "ring-fuchsia-400",
-  },
-];
-
-// ── Component ─────────────────────────────────────────────────────────────────
+import { PROJECT_COLOR_OPTIONS } from "./projectColorOptions";
 
 interface ColorPickerProps {
   value: ProjectColor;
@@ -97,12 +36,11 @@ export function ColorPicker({
     }
   }
 
-  const selectedNamed = COLOR_OPTIONS.find((c) => c.value === value);
+  const selectedNamed = PROJECT_COLOR_OPTIONS.find((c) => c.value === value);
   const isAiSelected = value.startsWith("#");
 
   return (
     <div className="space-y-3">
-      {/* Label row */}
       <div className="flex items-center justify-between">
         <label className="text-xs font-medium text-white/50">Color</label>
         {aiEnabled && (
@@ -117,30 +55,29 @@ export function ColorPicker({
             ) : (
               <Sparkles size={10} />
             )}
-            {aiLoading ? "Generating…" : "Generate with Luna"}
+            {aiLoading ? "Generating." : "Generate with Luna"}
           </button>
         )}
       </div>
 
-      {/* Swatch palette */}
-      <div className="flex flex-wrap gap-2">
-        {COLOR_OPTIONS.map((c) => (
+      <div className="grid grid-cols-8 gap-2">
+        {PROJECT_COLOR_OPTIONS.map((c) => (
           <button
             key={c.value}
             type="button"
             aria-label={c.label}
             title={c.label}
             onClick={() => onChange(c.value)}
-            className={`relative w-6 h-6 rounded-full transition-all duration-150 ${c.bg} ${
+            className={`relative w-8 h-8 rounded-full transition-all duration-150 ${c.bg} ${
               value === c.value
-                ? `ring-2 ${c.ring} ring-offset-1 ring-offset-orbit-800 scale-110 opacity-100`
-                : "opacity-50 hover:opacity-80 hover:scale-105"
+                ? `ring-2 ${c.ring} ring-offset-2 ring-offset-[#13111e] scale-105`
+                : "hover:scale-110 hover:brightness-110"
             }`}
           >
             {value === c.value && (
               <span className="absolute inset-0 flex items-center justify-center">
                 <Check
-                  size={9}
+                  size={11}
                   className="text-white drop-shadow"
                   strokeWidth={3}
                 />
@@ -150,12 +87,10 @@ export function ColorPicker({
         ))}
       </div>
 
-      {/* Selected palette color label */}
       {selectedNamed && !isAiSelected && (
         <p className="text-[11px] text-white/30">{selectedNamed.label}</p>
       )}
 
-      {/* AI-generated color swatch */}
       {aiColor && (
         <button
           type="button"
