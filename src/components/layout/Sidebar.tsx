@@ -9,6 +9,7 @@ import {
   PenLine,
   Menu,
   X,
+  FolderOpen,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
@@ -23,6 +24,7 @@ const NAV: {
 }[] = [
   { icon: ListTodo, label: "Tasks", to: "/" },
   { icon: StickyNote, label: "Notes", to: "/notes" },
+  { icon: FolderOpen, label: "Projects", to: "/projects" },
   {
     icon: MessagesSquare,
     label: "Meeting",
