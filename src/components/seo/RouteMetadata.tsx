@@ -33,6 +33,11 @@ const privateRouteMetadata: Record<string, Omit<RouteMeta, "robots">> = {
     description:
       "Work with Luna, the built-in Orbit assistant for planning and focus.",
   },
+  "/writing": {
+    title: "Writing Assistant | Orbit",
+    description:
+      "Improve, rephrase, and transform your text with Luna's AI-powered writing assistant inside Orbit.",
+  },
   "/archive": {
     title: "Archive | Orbit",
     description: "Browse completed work and archived history in Orbit.",

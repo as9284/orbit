@@ -445,6 +445,51 @@ export async function categorizeTask(
   };
 }
 
+// ── Categorize Note ──────────────────────────────────────────────────────────
+
+export async function categorizeNote(
+  title: string,
+  content: string | null | undefined,
+  existingCategories: readonly string[] = [],
+): Promise<CategorizeTaskResult> {
+  const cleanedExisting = existingCategories
+    .map(normalizeCategoryLabel)
+    .filter(Boolean);
+
+  const prompt = [
+    "You are an expert knowledge management assistant. Categorize the following note into a single concise category.",
+    "",
+    "Rules:",
+    "1. Return ONLY the category label — no explanation, reasoning, quotes, or punctuation.",
+    "2. Use Title Case, 1-3 words maximum.",
+    "3. Think about the domain, subject matter, and purpose of the note — not just keywords.",
+    "4. Consider these broad categories: Work, Personal, Ideas, Research, Learning, Journal, Health, Finance, Reference, Project, Meeting Notes, Creative, Travel, Recipes, Goals, Misc.",
+    cleanedExisting.length > 0
+      ? `5. Existing categories: [${cleanedExisting.join(", ")}]. Strongly prefer reusing one of these if the note fits. Only create a new category when no existing one reasonably applies.`
+      : "5. No existing categories yet — pick the most fitting general category.",
+    "",
+    `Note title: ${title}`,
+    content ? `Note content (excerpt): ${content.slice(0, 400)}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const result = await requestAiText(prompt);
+  if (!result.text) {
+    return { category: null, model: result.model, error: result.error };
+  }
+
+  const rawCategory = normalizeCategoryLabel(result.text.split("\n")[0] ?? "");
+  const existingMatch = matchExistingCategory(rawCategory, cleanedExisting);
+  const category = existingMatch ?? rawCategory;
+
+  return {
+    category: category || null,
+    model: result.model,
+    error: category ? null : "Luna returned an empty category.",
+  };
+}
+
 // ── Convert Note to Task ─────────────────────────────────────────────────────
 
 export async function convertNoteToTaskDraft(

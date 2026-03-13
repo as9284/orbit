@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import {
   Plus,
@@ -7,6 +7,8 @@ import {
   Trash2,
   StickyNote,
   Sparkles,
+  Tag,
+  X,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useNotesApi, useTasksApi } from "../components/layout/AppLayout";
@@ -35,6 +37,7 @@ export function NotesPage() {
   const [previewNote, setPreviewNote] = useState<Note | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [convertingNoteId, setConvertingNoteId] = useState<string | null>(null);
   const [summarizingNoteId, setSummarizingNoteId] = useState<string | null>(
     null,
@@ -56,6 +59,13 @@ export function NotesPage() {
   useEffect(() => {
     if (encryptionKey) api.fetchNotes();
   }, [encryptionKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Background-categorize notes after they load
+  useEffect(() => {
+    if (api.notes.length > 0) {
+      void api.backgroundCategorize(api.notes);
+    }
+  }, [api.notes.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcut: N to create new note
   const openCreate = useCallback(() => setCreateOpen(true), []);
@@ -80,13 +90,28 @@ export function NotesPage() {
     return () => window.removeEventListener("keydown", handler);
   }, [openCreate, createOpen, editNote, previewNote]);
 
-  const filtered = search.trim()
-    ? api.notes.filter(
-        (n) =>
-          n.title.toLowerCase().includes(search.toLowerCase()) ||
-          n.content?.toLowerCase().includes(search.toLowerCase()),
-      )
-    : api.notes;
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const note of api.notes) {
+      const cat = api.categories[note.id];
+      if (cat) cats.add(cat);
+    }
+    return [...cats].sort();
+  }, [api.notes, api.categories]);
+
+  const filtered = useMemo(() => {
+    let result = search.trim()
+      ? api.notes.filter(
+          (n) =>
+            n.title.toLowerCase().includes(search.toLowerCase()) ||
+            n.content?.toLowerCase().includes(search.toLowerCase()),
+        )
+      : api.notes;
+    if (categoryFilter) {
+      result = result.filter((n) => api.categories[n.id] === categoryFilter);
+    }
+    return result;
+  }, [api.notes, api.categories, search, categoryFilter]);
 
   const handleCreate = async (title: string, content: string) => {
     const id = await api.createNote({
@@ -245,7 +270,7 @@ export function NotesPage() {
       {/* Search */}
       {api.notes.length > 0 && (
         <div
-          className="mb-6 animate-fade-in"
+          className="mb-4 animate-fade-in"
           style={{ animationDelay: "50ms" }}
         >
           <input
@@ -255,6 +280,65 @@ export function NotesPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-white/4 border border-white/8 rounded-xl px-4 py-2.5 text-sm text-white/85 placeholder:text-white/25 outline-none focus:border-violet-500/35 transition-colors"
           />
+        </div>
+      )}
+
+      {/* Category filter chips */}
+      {(uniqueCategories.length > 0 || api.isCategorizingBackground) && (
+        <div
+          className="flex items-center gap-2 flex-wrap mb-6 animate-fade-in"
+          style={{ animationDelay: "80ms" }}
+        >
+          <span className="flex items-center gap-1 text-[10px] text-white/25 font-semibold uppercase tracking-widest shrink-0">
+            <Tag size={10} />
+            Category
+            {api.isCategorizingBackground && (
+              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-violet-400/60 animate-pulse" />
+            )}
+          </span>
+          {uniqueCategories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() =>
+                setCategoryFilter(cat === categoryFilter ? null : cat)
+              }
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 border ${
+                categoryFilter === cat
+                  ? "bg-violet-500/20 text-violet-300 border-violet-500/30"
+                  : "bg-white/4 text-white/40 border-white/8 hover:text-white/65 hover:bg-white/7 hover:border-white/15"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+          {categoryFilter && (
+            <button
+              onClick={() => setCategoryFilter(null)}
+              className="flex items-center gap-1 text-[11px] text-white/25 hover:text-white/50 transition-colors"
+              aria-label="Clear category filter"
+            >
+              <X size={10} />
+              Clear
+            </button>
+          )}
+          {!api.isCategorizingBackground &&
+            isFeatureReady("autoCategorize") &&
+            api.notes.some((n) => !api.categories[n.id]) && (
+              <button
+                onClick={() => void api.backgroundCategorize(api.notes)}
+                className="ml-auto flex items-center gap-1 text-[11px] text-white/25 hover:text-violet-400 transition-colors"
+                title="Categorise remaining notes"
+              >
+                <Sparkles size={11} />
+                Categorise
+              </button>
+            )}
+        </div>
+      )}
+
+      {api.aiStatus && !api.aiStatus.startsWith("Luna via ") && (
+        <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/6 px-3 py-2 text-xs text-amber-200/80">
+          {api.aiStatus}
         </div>
       )}
 
@@ -293,6 +377,7 @@ export function NotesPage() {
             >
               <NoteCard
                 note={note}
+                category={api.categories[note.id] ?? null}
                 converting={convertingNoteId === note.id}
                 onEdit={setEditNote}
                 onPreview={setPreviewNote}
@@ -369,6 +454,7 @@ export function NotesPage() {
 
 function NoteCard({
   note,
+  category,
   converting,
   onEdit,
   onPreview,
@@ -376,6 +462,7 @@ function NoteCard({
   onConvert,
 }: {
   note: Note;
+  category: string | null;
   converting: boolean;
   onEdit: (note: Note) => void;
   onPreview: (note: Note) => void;
@@ -410,38 +497,45 @@ function NoteCard({
         <span className="text-[10px] text-white/20">
           {format(parseISO(note.updated_at), "MMM d, yyyy")}
         </span>
-        <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onConvert(note);
-            }}
-            disabled={converting}
-            className="p-1.5 rounded-lg text-cyan-300/45 hover:text-cyan-200 hover:bg-cyan-500/10 transition-all disabled:opacity-60 disabled:cursor-wait"
-            aria-label="Convert note to task with Luna"
-          >
-            {converting ? <Spinner size={12} /> : <Sparkles size={12} />}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(note);
-            }}
-            className="p-1.5 rounded-lg text-white/25 hover:text-white/70 hover:bg-white/[0.07] transition-all"
-            aria-label="Edit note"
-          >
-            <Pencil size={12} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(note.id);
-            }}
-            className="p-1.5 rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/8 transition-all"
-            aria-label="Delete note"
-          >
-            <Trash2 size={12} />
-          </button>
+        <div className="flex items-center gap-1.5">
+          {category && (
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-violet-500/12 text-violet-300/70 border border-violet-400/15">
+              {category}
+            </span>
+          )}
+          <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onConvert(note);
+              }}
+              disabled={converting}
+              className="p-1.5 rounded-lg text-cyan-300/45 hover:text-cyan-200 hover:bg-cyan-500/10 transition-all disabled:opacity-60 disabled:cursor-wait"
+              aria-label="Convert note to task with Luna"
+            >
+              {converting ? <Spinner size={12} /> : <Sparkles size={12} />}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(note);
+              }}
+              className="p-1.5 rounded-lg text-white/25 hover:text-white/70 hover:bg-white/[0.07] transition-all"
+              aria-label="Edit note"
+            >
+              <Pencil size={12} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(note.id);
+              }}
+              className="p-1.5 rounded-lg text-white/25 hover:text-red-400 hover:bg-red-500/8 transition-all"
+              aria-label="Delete note"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { encrypt, decrypt } from "../lib/encryption";
+import { isFeatureReady, getActiveApiKey } from "../lib/ai";
+import { categorizeNote } from "../lib/openrouter";
 import type { Note } from "../types/database.types";
 
 export interface CreateNoteData {
@@ -24,6 +26,143 @@ export function useNotes(userId: string, encryptionKey: CryptoKey | null) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
+
+  const categoriesKey = `orbit:note-categories:${userId}`;
+  const [categories, setCategories] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem(`orbit:note-categories:${userId}`) ?? "{}",
+      ) as Record<string, string>;
+    } catch {
+      return {};
+    }
+  });
+  const [isCategorizingBackground, setIsCategorizingBackground] =
+    useState(false);
+  const categorizingRef = useRef(false);
+
+  const readStoredCategories = useCallback((): Record<string, string> => {
+    try {
+      return JSON.parse(localStorage.getItem(categoriesKey) ?? "{}") as Record<
+        string,
+        string
+      >;
+    } catch {
+      return {};
+    }
+  }, [categoriesKey]);
+
+  const writeStoredCategories = useCallback(
+    (next: Record<string, string>) => {
+      localStorage.setItem(categoriesKey, JSON.stringify(next));
+      setCategories({ ...next });
+    },
+    [categoriesKey],
+  );
+
+  const getExistingCategoryPool = useCallback(
+    (stored: Record<string, string>): string[] => {
+      return [...new Set(Object.values(stored).filter(Boolean))].sort();
+    },
+    [],
+  );
+
+  // Listen for category-clear events from the settings panel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ userId: string }>;
+      if (ce.detail.userId === userId) setCategories({});
+    };
+    window.addEventListener("orbit:note-categories:cleared", handler);
+    return () =>
+      window.removeEventListener("orbit:note-categories:cleared", handler);
+  }, [userId]);
+
+  const backgroundCategorize = useCallback(
+    async (notesList: Note[]) => {
+      if (categorizingRef.current) return;
+      if (!isFeatureReady("autoCategorize")) return;
+      categorizingRef.current = true;
+      setIsCategorizingBackground(true);
+      setAiStatus(null);
+      try {
+        const stored = readStoredCategories();
+        const noteIds = new Set(notesList.map((n) => n.id));
+        const pruned: Record<string, string> = {};
+        for (const [id, cat] of Object.entries(stored)) {
+          if (noteIds.has(id)) pruned[id] = cat;
+        }
+        const uncategorized = notesList.filter((n) => !pruned[n.id]);
+        writeStoredCategories(pruned);
+
+        for (const note of uncategorized) {
+          if (!categorizingRef.current) break;
+          const existingCategories = getExistingCategoryPool(pruned);
+          const result = await categorizeNote(
+            note.title,
+            note.content,
+            existingCategories,
+          );
+          if (result.category) {
+            pruned[note.id] = result.category;
+            writeStoredCategories(pruned);
+            if (result.model) {
+              setAiStatus(`Luna via ${result.model}`);
+            }
+            continue;
+          }
+          if (result.error) {
+            setAiStatus(result.error);
+            setError(`Luna categorization failed: ${result.error}`);
+            break;
+          }
+        }
+      } finally {
+        setIsCategorizingBackground(false);
+        categorizingRef.current = false;
+      }
+    },
+    [readStoredCategories, writeStoredCategories], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const categorizeSingleNote = useCallback(
+    async ({
+      noteId,
+      title,
+      content,
+    }: {
+      noteId: string;
+      title: string;
+      content?: string | null;
+    }) => {
+      const apiKey = getActiveApiKey();
+      if (!apiKey) {
+        return {
+          category: null,
+          model: null,
+          error: "Missing API key — configure one in Settings → Luna.",
+        };
+      }
+      const stored = readStoredCategories();
+      const existingCategories = getExistingCategoryPool(stored);
+      const result = await categorizeNote(title, content, existingCategories);
+      if (result.category) {
+        stored[noteId] = result.category;
+        writeStoredCategories(stored);
+        if (result.model) {
+          setAiStatus(`Luna via ${result.model}`);
+        }
+        return result;
+      }
+      if (result.error) {
+        setAiStatus(result.error);
+        setError(`Luna categorization failed: ${result.error}`);
+      }
+      return result;
+    },
+    [getExistingCategoryPool, readStoredCategories, writeStoredCategories],
+  );
 
   const fetchNotes = useCallback(async () => {
     if (!encryptionKey) return;
@@ -110,10 +249,15 @@ export function useNotes(userId: string, encryptionKey: CryptoKey | null) {
     notes,
     loading,
     error,
+    aiStatus,
+    categories,
+    isCategorizingBackground,
     fetchNotes,
     createNote,
     updateNote,
     deleteNote,
+    backgroundCategorize,
+    categorizeSingleNote,
   };
 }
 

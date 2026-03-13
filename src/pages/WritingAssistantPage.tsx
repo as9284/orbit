@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import {
   PenLine,
@@ -71,12 +71,32 @@ const MODES: ModeOption[] = [
 export function WritingAssistantPage() {
   const { user } = useAuth();
   const userName: string = user?.user_metadata?.full_name ?? user?.email ?? "";
-  const [input, setInput] = useState("");
-  const [output, setOutput] = useState("");
-  const [activeMode, setActiveMode] = useState<WritingMode>("improve");
+  const [input, setInput] = useState(
+    () => sessionStorage.getItem("orbit:writing:input") ?? "",
+  );
+  const [output, setOutput] = useState(
+    () => sessionStorage.getItem("orbit:writing:output") ?? "",
+  );
+  const [activeMode, setActiveMode] = useState<WritingMode>(
+    () =>
+      (sessionStorage.getItem("orbit:writing:mode") as WritingMode | null) ??
+      "improve",
+  );
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const outputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    sessionStorage.setItem("orbit:writing:input", input);
+  }, [input]);
+
+  useEffect(() => {
+    sessionStorage.setItem("orbit:writing:output", output);
+  }, [output]);
+
+  useEffect(() => {
+    sessionStorage.setItem("orbit:writing:mode", activeMode);
+  }, [activeMode]);
 
   const handleProcess = useCallback(async () => {
     if (!input.trim()) {
@@ -135,7 +155,7 @@ export function WritingAssistantPage() {
   const featureReady = isFeatureReady("writingAssistant");
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-white/6 shrink-0">
         <div className="flex items-center gap-3">
