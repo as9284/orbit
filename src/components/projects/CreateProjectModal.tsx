@@ -1,14 +1,20 @@
 import { useState } from "react";
+import { Sparkles, LoaderCircle, X } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { DatePicker } from "../ui/DatePicker";
 import { ColorPicker } from "./ColorPicker";
 import type { ProjectColor } from "../../types/database.types";
 import type { CreateProjectData } from "../../hooks/useProjects";
+import {
+  generateProjectStarterPlan,
+  type AiTaskDraft,
+} from "../../lib/openrouter";
+import { isFeatureReady } from "../../lib/ai";
 
 interface CreateProjectModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (data: CreateProjectData) => void;
+  onCreate: (data: CreateProjectData, starterTasks?: AiTaskDraft[]) => void;
 }
 
 export function CreateProjectModal({
@@ -20,26 +26,55 @@ export function CreateProjectModal({
   const [description, setDescription] = useState("");
   const [color, setColor] = useState<ProjectColor>("violet");
   const [deadline, setDeadline] = useState("");
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [starterTasks, setStarterTasks] = useState<AiTaskDraft[]>([]);
+
+  const aiReady = isFeatureReady("lunaChat");
 
   function handleClose() {
     setName("");
     setDescription("");
     setColor("violet");
     setDeadline("");
+    setStarterTasks([]);
+    setGeneratingPlan(false);
     onClose();
+  }
+
+  async function handleGeneratePlan() {
+    if (!name.trim()) return;
+    setGeneratingPlan(true);
+    const result = await generateProjectStarterPlan(name, description);
+    setGeneratingPlan(false);
+    if (result.tasks.length > 0) {
+      setStarterTasks(result.tasks);
+    }
+  }
+
+  function removeStarterTask(index: number) {
+    setStarterTasks((prev) => prev.filter((_, i) => i !== index));
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    onCreate({
-      name,
-      description,
-      color,
-      deadline: deadline || null,
-    });
+    onCreate(
+      {
+        name,
+        description,
+        color,
+        deadline: deadline || null,
+      },
+      starterTasks.length > 0 ? starterTasks : undefined,
+    );
     handleClose();
   }
+
+  const PRIORITY_COLORS: Record<string, string> = {
+    high: "text-rose-400",
+    medium: "text-amber-400",
+    low: "text-blue-400",
+  };
 
   return (
     <Modal open={open} onClose={handleClose} title="New project">
@@ -76,6 +111,78 @@ export function CreateProjectModal({
             className="w-full bg-white/4 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-violet-400/50 focus:bg-white/6 transition-all resize-none"
           />
         </div>
+
+        {/* AI Starter Plan */}
+        {aiReady && (
+          <div>
+            {starterTasks.length === 0 ? (
+              <button
+                type="button"
+                onClick={handleGeneratePlan}
+                disabled={!name.trim() || generatingPlan}
+                className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-sm border border-dashed border-violet-500/30 text-violet-400/70 hover:text-violet-300 hover:border-violet-400/50 hover:bg-violet-500/5 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                {generatingPlan ? (
+                  <>
+                    <LoaderCircle size={13} className="animate-spin shrink-0" />
+                    Generating starter plan…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={13} className="shrink-0" />
+                    Generate starter plan with Luna
+                  </>
+                )}
+              </button>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-white/30">
+                    Starter tasks
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleGeneratePlan}
+                    disabled={generatingPlan}
+                    className="flex items-center gap-1 text-[10px] text-violet-400/60 hover:text-violet-300 transition-colors disabled:opacity-40"
+                  >
+                    {generatingPlan ? (
+                      <LoaderCircle size={10} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={10} />
+                    )}
+                    Regenerate
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  {starterTasks.map((task, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-2 px-3 py-2 bg-white/3 border border-white/7 rounded-lg group"
+                    >
+                      <span
+                        className={`text-[10px] font-bold uppercase mt-0.5 shrink-0 w-10 ${PRIORITY_COLORS[task.priority] ?? "text-white/30"}`}
+                      >
+                        {task.priority}
+                      </span>
+                      <span className="flex-1 text-sm text-white/70 min-w-0">
+                        {task.title}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeStarterTask(i)}
+                        className="p-0.5 rounded text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                        aria-label={`Remove "${task.title}"`}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Deadline */}
         <div>

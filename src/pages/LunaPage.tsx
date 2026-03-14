@@ -26,6 +26,7 @@ import {
 import { useTasksApi, useNotesApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
 import { useMeetingSessions } from "../hooks/useMeetingSessions";
+import { useProjects } from "../hooks/useProjects";
 
 import {
   hasApiKey,
@@ -70,6 +71,7 @@ export function LunaPage() {
   const { user, encryptionKey } = useAuth();
   const tasksApi = useTasksApi();
   const notesApi = useNotesApi();
+  const projectsApi = useProjects(user!.id);
   const meetingApi = useMeetingSessions(user?.id);
   const { activeSession, sessions: meetingSessions } = meetingApi;
   const userName: string = user?.user_metadata?.full_name ?? user?.email ?? "";
@@ -283,6 +285,14 @@ export function LunaPage() {
               title: n.title,
               content: n.content,
               updated_at: n.updated_at,
+            })),
+            projects: projectsApi.projects.map((p) => ({
+              id: p.id,
+              name: p.name,
+              description: p.description,
+              deadline: p.deadline,
+              taskIds: p.taskIds,
+              noteIds: p.noteIds,
             })),
             meetingSessions: {
               active: activeSession
@@ -678,6 +688,200 @@ export function LunaPage() {
               return "Note categories have been cleared and are being regenerated in the background.";
             }
 
+            if (name === "update_task") {
+              const taskTitle = String(args.task_title ?? "");
+              const match =
+                tasksApi.activeTasks.find(
+                  (t) => t.title.toLowerCase() === taskTitle.toLowerCase(),
+                ) ??
+                tasksApi.activeTasks.find((t) =>
+                  t.title.toLowerCase().includes(taskTitle.toLowerCase()),
+                );
+              if (!match) {
+                return `Could not find an active task matching "${taskTitle}"`;
+              }
+              const updates: {
+                title?: string;
+                description?: string;
+                priority?: "low" | "medium" | "high";
+                due_date?: string | null;
+              } = {};
+              if (args.new_title) updates.title = String(args.new_title);
+              if (args.description !== undefined)
+                updates.description = String(args.description);
+              if (
+                args.priority === "low" ||
+                args.priority === "medium" ||
+                args.priority === "high"
+              )
+                updates.priority = args.priority;
+              if (args.due_date !== undefined)
+                updates.due_date =
+                  args.due_date === "" ? null : String(args.due_date);
+              const statusId = createToolStatusMessage(
+                "update_task",
+                `Updating task: ${match.title}`,
+              );
+              await waitForNextPaint();
+              const ok = await tasksApi.updateTask(match.id, updates);
+              updateToolStatusMessage(statusId, {
+                tool: "update_task",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Updated task: ${updates.title ?? match.title}`
+                  : "Failed to update task",
+              });
+              if (ok)
+                toast.success(`Task updated: ${updates.title ?? match.title}`);
+              else toast.error("Failed to update task");
+              return ok
+                ? `Task updated: "${updates.title ?? match.title}"`
+                : "Failed to update task";
+            }
+
+            if (name === "update_note") {
+              const noteTitle = String(args.note_title ?? "");
+              const match =
+                notesApi.notes.find(
+                  (n) => n.title.toLowerCase() === noteTitle.toLowerCase(),
+                ) ??
+                notesApi.notes.find((n) =>
+                  n.title.toLowerCase().includes(noteTitle.toLowerCase()),
+                );
+              if (!match) {
+                return `Could not find a note matching "${noteTitle}"`;
+              }
+              const updates: { title?: string; content?: string } = {};
+              if (args.new_title) updates.title = String(args.new_title);
+              if (args.content !== undefined)
+                updates.content = String(args.content);
+              const statusId = createToolStatusMessage(
+                "update_note",
+                `Updating note: ${match.title}`,
+              );
+              await waitForNextPaint();
+              const ok = await notesApi.updateNote(match.id, updates);
+              updateToolStatusMessage(statusId, {
+                tool: "update_note",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Updated note: ${updates.title ?? match.title}`
+                  : "Failed to update note",
+              });
+              if (ok)
+                toast.success(`Note updated: ${updates.title ?? match.title}`);
+              else toast.error("Failed to update note");
+              return ok
+                ? `Note updated: "${updates.title ?? match.title}"`
+                : "Failed to update note";
+            }
+
+            if (name === "create_project") {
+              const projectName = String(args.name ?? "Untitled Project");
+              const description = args.description
+                ? String(args.description)
+                : undefined;
+              const deadline = args.deadline ? String(args.deadline) : null;
+              const statusId = createToolStatusMessage(
+                "create_project",
+                `Creating project: ${projectName}`,
+              );
+              await waitForNextPaint();
+              const project = projectsApi.createProject({
+                name: projectName,
+                description,
+                deadline,
+              });
+              const ok = !!project;
+              updateToolStatusMessage(statusId, {
+                tool: "create_project",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Created project: ${projectName}`
+                  : "Failed to create project",
+              });
+              if (ok) toast.success(`Project created: ${projectName}`);
+              return ok
+                ? `Project created: "${projectName}"`
+                : "Failed to create project";
+            }
+
+            if (name === "link_task_to_project") {
+              const taskTitle = String(args.task_title ?? "");
+              const projectName = String(args.project_name ?? "");
+              const task =
+                tasksApi.activeTasks.find(
+                  (t) => t.title.toLowerCase() === taskTitle.toLowerCase(),
+                ) ??
+                tasksApi.activeTasks.find((t) =>
+                  t.title.toLowerCase().includes(taskTitle.toLowerCase()),
+                );
+              if (!task) {
+                return `Could not find an active task matching "${taskTitle}"`;
+              }
+              const project =
+                projectsApi.projects.find(
+                  (p) => p.name.toLowerCase() === projectName.toLowerCase(),
+                ) ??
+                projectsApi.projects.find((p) =>
+                  p.name.toLowerCase().includes(projectName.toLowerCase()),
+                );
+              if (!project) {
+                return `Could not find a project matching "${projectName}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "link_task_to_project",
+                `Linking "${task.title}" → "${project.name}"`,
+              );
+              await waitForNextPaint();
+              projectsApi.linkTask(project.id, task.id);
+              updateToolStatusMessage(statusId, {
+                tool: "link_task_to_project",
+                status: "success",
+                label: `Linked task to project: ${project.name}`,
+              });
+              toast.success(`Task linked to "${project.name}"`);
+              return `Task "${task.title}" linked to project "${project.name}"`;
+            }
+
+            if (name === "link_note_to_project") {
+              const noteTitle = String(args.note_title ?? "");
+              const projectName = String(args.project_name ?? "");
+              const note =
+                notesApi.notes.find(
+                  (n) => n.title.toLowerCase() === noteTitle.toLowerCase(),
+                ) ??
+                notesApi.notes.find((n) =>
+                  n.title.toLowerCase().includes(noteTitle.toLowerCase()),
+                );
+              if (!note) {
+                return `Could not find a note matching "${noteTitle}"`;
+              }
+              const project =
+                projectsApi.projects.find(
+                  (p) => p.name.toLowerCase() === projectName.toLowerCase(),
+                ) ??
+                projectsApi.projects.find((p) =>
+                  p.name.toLowerCase().includes(projectName.toLowerCase()),
+                );
+              if (!project) {
+                return `Could not find a project matching "${projectName}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "link_note_to_project",
+                `Linking "${note.title}" → "${project.name}"`,
+              );
+              await waitForNextPaint();
+              projectsApi.linkNote(project.id, note.id);
+              updateToolStatusMessage(statusId, {
+                tool: "link_note_to_project",
+                status: "success",
+                label: `Linked note to project: ${project.name}`,
+              });
+              toast.success(`Note linked to "${project.name}"`);
+              return `Note "${note.title}" linked to project "${project.name}"`;
+            }
+
             return "Unknown tool";
           },
           onDone: (fullText, reasoning) => {
@@ -747,6 +951,7 @@ export function LunaPage() {
       messages,
       tasksApi,
       notesApi,
+      projectsApi,
       meetingApi,
       activeSession,
       meetingSessions,

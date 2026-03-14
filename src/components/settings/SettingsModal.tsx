@@ -642,10 +642,16 @@ function AITab() {
     update({ model });
   };
 
-  const handleToggleFeature = (feature: keyof typeof settings.features) => {
-    const features = {
-      ...settings.features,
-      [feature]: !settings.features[feature],
+  const allFeaturesOn = Object.values(settings.features).every(Boolean);
+
+  const handleToggleAll = () => {
+    const next = !allFeaturesOn;
+    const features: typeof settings.features = {
+      autoCategorize: next,
+      noteTools: next,
+      lunaChat: next,
+      meetingMode: next,
+      writingAssistant: next,
     };
     update({ features });
   };
@@ -776,67 +782,35 @@ function AITab() {
       </SettingsSection>
 
       <SettingsSection label="Features">
-        <div className="space-y-2">
-          {[
-            {
-              key: "meetingMode" as const,
-              label: "Meeting Mode",
-              desc: "Capture meeting notes and let Luna create one note and one follow-up task when the session ends",
-            },
-            {
-              key: "autoCategorize" as const,
-              label: "Auto-categorize tasks & notes",
-              desc: "Luna automatically assigns a category to new tasks and notes",
-            },
-            {
-              key: "noteTools" as const,
-              label: "Note AI features",
-              desc: "Enable note summaries and note-to-task conversion",
-            },
-            {
-              key: "lunaChat" as const,
-              label: "Luna chat",
-              desc: "Chat with Luna to manage tasks and get advice",
-            },
-            {
-              key: "writingAssistant" as const,
-              label: "Writing Assistant",
-              desc: "AI-powered text improvement, grammar fixing, rephrasing, and more",
-            },
-          ].map(({ key, label, desc }) => (
-            <label
-              key={key}
-              className="flex items-center justify-between gap-3 py-1.5 cursor-pointer group"
-            >
-              <div className="min-w-0">
-                <span className="text-xs text-white/70 font-medium group-hover:text-white/90 transition-colors">
-                  {label}
-                </span>
-                <p className="text-[10px] text-white/25 mt-0.5 leading-snug">
-                  {desc}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={settings.features[key]}
-                onClick={() => handleToggleFeature(key)}
-                className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 ${
-                  settings.features[key] ? "bg-violet-500" : "bg-white/10"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                    settings.features[key] ? "translate-x-4" : ""
-                  }`}
-                />
-              </button>
-            </label>
-          ))}
-        </div>
+        <label className="flex items-center justify-between gap-3 py-1 cursor-pointer group">
+          <div className="min-w-0">
+            <span className="text-xs text-white/70 font-medium group-hover:text-white/90 transition-colors">
+              Enable all AI features
+            </span>
+            <p className="text-[10px] text-white/25 mt-0.5 leading-snug">
+              Luna chat, Meeting Mode, Writing Assistant, auto-categorize, and
+              note AI tools
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={allFeaturesOn}
+            onClick={handleToggleAll}
+            className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 ${
+              allFeaturesOn ? "bg-violet-500" : "bg-white/10"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                allFeaturesOn ? "translate-x-4" : ""
+              }`}
+            />
+          </button>
+        </label>
         {!currentKey.trim() && (
           <p className="text-[10px] text-amber-400/60 mt-2">
-            Add an API key above to enable Luna features.
+            Add an API key above to enable AI features.
           </p>
         )}
       </SettingsSection>

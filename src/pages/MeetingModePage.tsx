@@ -30,7 +30,10 @@ import {
   type MeetingSession,
 } from "../hooks/useMeetingSessions";
 import { getAiSettings, hasApiKey } from "../lib/ai";
-import { generateMeetingArtifacts } from "../lib/openrouter";
+import {
+  generateMeetingArtifacts,
+  generateMeetingAgenda,
+} from "../lib/openrouter";
 
 const MEETING_ENDING_PREFIX = "orbit:meeting-ending";
 
@@ -113,7 +116,7 @@ export function MeetingModePage() {
   const selectedHistorySession =
     sessions.find((session) => session.id === selectedHistorySessionId) ?? null;
 
-  const handleStartMeeting = useCallback(() => {
+  const handleStartMeeting = useCallback(async () => {
     if (activeSession) {
       toast.error("Finish or discard the current meeting first");
       return;
@@ -143,7 +146,24 @@ export function MeetingModePage() {
     setMeetingTitle("");
     setSelectedHistorySessionId(null);
     toast.success("Meeting started");
-  }, [activeSession, apiKeyReady, meetingEnabled, meetingTitle, startSession]);
+
+    // Generate and inject an agenda as the first entry (non-blocking)
+    try {
+      const agendaResult = await generateMeetingAgenda(meetingTitle);
+      if (agendaResult.agenda) {
+        addEntry(`📋 Suggested Agenda\n\n${agendaResult.agenda}`);
+      }
+    } catch {
+      // Agenda is best-effort; silently ignore failures
+    }
+  }, [
+    activeSession,
+    apiKeyReady,
+    meetingEnabled,
+    meetingTitle,
+    startSession,
+    addEntry,
+  ]);
 
   const handleAddEntry = useCallback(
     (e?: FormEvent) => {

@@ -28,6 +28,24 @@ export interface CategorizeTaskResult {
   error: string | null;
 }
 
+export interface ProjectStarterPlanResult {
+  tasks: AiTaskDraft[];
+  model: string | null;
+  error: string | null;
+}
+
+export interface SuggestSubTasksResult {
+  subTasks: string[];
+  model: string | null;
+  error: string | null;
+}
+
+export interface GenerateMeetingAgendaResult {
+  agenda: string | null;
+  model: string | null;
+  error: string | null;
+}
+
 export interface AiTaskDraft {
   title: string;
   description: string;
@@ -669,6 +687,136 @@ export async function generateMeetingArtifacts(
   };
 }
 
+// ── Generate Project Starter Plan ─────────────────────────────────────────────
+
+export async function generateProjectStarterPlan(
+  name: string,
+  description: string | null | undefined,
+): Promise<ProjectStarterPlanResult> {
+  const prompt = [
+    "You are a productivity expert. Generate a concise starter plan for a new project.",
+    "Respond with raw JSON only — no markdown fences, no commentary.",
+    "",
+    'Required JSON shape: {"tasks":[{"title":"string","description":"string","priority":"low|medium|high","subTasks":["string"]}]}',
+    "",
+    "Rules:",
+    "- Generate 3-6 tasks that cover the essential first steps to get this project off the ground.",
+    "- Each task title must start with an action verb and be concise (max 80 chars).",
+    "- description: 1-2 sentences of context or acceptance criteria. Use empty string if the title is self-explanatory.",
+    "- priority: high for critical/blocking first tasks, medium for standard steps, low for optional polish tasks.",
+    "- subTasks: 0-4 concrete sub-steps per task. Only include when the task genuinely breaks into distinct actions.",
+    "- Tasks should be ordered logically (e.g. research before build, setup before deploy).",
+    "- Do NOT include vague feel-good tasks. Every task must be actionable.",
+    "",
+    `Project name: ${name}`,
+    description ? `Project description: ${description}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const result = await requestAiText(prompt, 800);
+  if (!result.text) {
+    return { tasks: [], model: result.model, error: result.error };
+  }
+
+  try {
+    const parsed = JSON.parse(stripMarkdownCodeFence(result.text)) as {
+      tasks?: unknown[];
+    };
+    const rawTasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
+    const tasks: AiTaskDraft[] = rawTasks
+      .map((item) => parseTaskDraft(JSON.stringify(item)))
+      .filter((t): t is AiTaskDraft => t !== null)
+      .slice(0, 6);
+    if (tasks.length === 0) {
+      return {
+        tasks: [],
+        model: result.model,
+        error: "Luna returned no usable tasks.",
+      };
+    }
+    return { tasks, model: result.model, error: null };
+  } catch {
+    return {
+      tasks: [],
+      model: result.model,
+      error: `Luna returned invalid JSON: ${result.text.slice(0, 180)}`,
+    };
+  }
+}
+
+// ── Suggest Sub-tasks ─────────────────────────────────────────────────────────
+
+export async function suggestSubTasks(
+  title: string,
+  description: string | null | undefined,
+): Promise<SuggestSubTasksResult> {
+  const prompt = [
+    "You are a productivity expert. Suggest concrete sub-tasks for the following task.",
+    "Respond with raw JSON only — no markdown fences, no commentary.",
+    "",
+    'Required JSON shape: {"subTasks":["string"]}',
+    "",
+    "Rules:",
+    "- Return 2-5 specific, independently completable action phrases.",
+    "- Each sub-task should start with a verb and be 5-80 characters long.",
+    "- Do NOT restate the main task title as a sub-task.",
+    "- Do NOT create artificial splits of one continuous action.",
+    "- Return an empty array if the task is already atomic.",
+    "",
+    `Task title: ${title}`,
+    description ? `Task description: ${description}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const result = await requestAiText(prompt, 250);
+  if (!result.text) {
+    return { subTasks: [], model: result.model, error: result.error };
+  }
+
+  try {
+    const parsed = JSON.parse(stripMarkdownCodeFence(result.text)) as {
+      subTasks?: unknown[];
+    };
+    const subTasks = coerceStringList(parsed.subTasks, 5);
+    return { subTasks, model: result.model, error: null };
+  } catch {
+    return {
+      subTasks: [],
+      model: result.model,
+      error: `Luna returned invalid JSON: ${result.text.slice(0, 180)}`,
+    };
+  }
+}
+
+// ── Generate Meeting Agenda ───────────────────────────────────────────────────
+
+export async function generateMeetingAgenda(
+  title: string,
+): Promise<GenerateMeetingAgendaResult> {
+  const prompt = [
+    "You are a meeting facilitator. Generate a concise, structured meeting agenda for the following meeting.",
+    "Respond with markdown only — no JSON, no preamble, no sign-off.",
+    "",
+    "Rules:",
+    "- Use a short intro line, then a numbered list of 3-6 agenda items.",
+    "- Each item should be short (one line) and actionable.",
+    "- End with a single line: 'Action items & next steps'.",
+    "- Do NOT add a title heading — the meeting already has a title.",
+    "- Keep the total response under 200 words.",
+    "",
+    `Meeting title: ${title}`,
+  ].join("\n");
+
+  const result = await requestAiText(prompt, 300);
+  if (!result.text) {
+    return { agenda: null, model: result.model, error: result.error };
+  }
+
+  return { agenda: result.text.trim(), model: result.model, error: null };
+}
+
 // ── Luna Chat ────────────────────────────────────────────────────────────────
 
 interface LunaTool {
@@ -898,6 +1046,138 @@ const LUNA_TOOLS: LunaTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "update_task",
+      description:
+        "Update an existing task's title, description, priority, or due date. Use when the user asks to edit, change, rename, or modify a task.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_title: {
+            type: "string",
+            description: "The current title of the task to update",
+          },
+          new_title: {
+            type: "string",
+            description: "New title (omit to keep existing)",
+          },
+          description: {
+            type: "string",
+            description: "New description (omit to keep existing)",
+          },
+          priority: {
+            type: "string",
+            enum: ["low", "medium", "high"],
+            description: "New priority (omit to keep existing)",
+          },
+          due_date: {
+            type: "string",
+            description:
+              "New due date in YYYY-MM-DD format, or empty string to clear it (omit to keep existing)",
+          },
+        },
+        required: ["task_title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_note",
+      description:
+        "Update an existing note's title or content. Use when the user asks to edit, change, rename, or modify a note.",
+      parameters: {
+        type: "object",
+        properties: {
+          note_title: {
+            type: "string",
+            description: "The current title of the note to update",
+          },
+          new_title: {
+            type: "string",
+            description: "New title (omit to keep existing)",
+          },
+          content: {
+            type: "string",
+            description: "New content in markdown (omit to keep existing)",
+          },
+        },
+        required: ["note_title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_project",
+      description:
+        "Create a new project to organize tasks and notes around a goal. Use when the user asks to create or start a new project.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Project name",
+          },
+          description: {
+            type: "string",
+            description: "Optional description of the project goal",
+          },
+          deadline: {
+            type: "string",
+            description: "Optional deadline in YYYY-MM-DD format",
+          },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "link_task_to_project",
+      description:
+        "Link an existing task to a project. Use when the user asks to add a task to a project or assign a task to a project.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_title: {
+            type: "string",
+            description: "The title of the task to link",
+          },
+          project_name: {
+            type: "string",
+            description: "The name of the project to link the task to",
+          },
+        },
+        required: ["task_title", "project_name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "link_note_to_project",
+      description:
+        "Link an existing note to a project. Use when the user asks to add a note to a project or associate a note with a project.",
+      parameters: {
+        type: "object",
+        properties: {
+          note_title: {
+            type: "string",
+            description: "The title of the note to link",
+          },
+          project_name: {
+            type: "string",
+            description: "The name of the project to link the note to",
+          },
+        },
+        required: ["note_title", "project_name"],
+      },
+    },
+  },
 ];
 
 export function buildLunaSystemPrompt(context: {
@@ -909,6 +1189,14 @@ export function buildLunaSystemPrompt(context: {
     completed: boolean;
   }[];
   notes: { title: string; content?: string | null; updated_at?: string }[];
+  projects?: {
+    id: string;
+    name: string;
+    description?: string;
+    deadline?: string | null;
+    taskIds: string[];
+    noteIds: string[];
+  }[];
   meetingSessions?: {
     active: {
       title: string;
@@ -955,6 +1243,27 @@ export function buildLunaSystemPrompt(context: {
     })
     .join("\n");
 
+  const projectLines =
+    context.projects && context.projects.length > 0
+      ? context.projects
+          .slice(0, 20)
+          .map((p) => {
+            const parts: string[] = [
+              `- ${p.name}${p.deadline ? ` (deadline: ${p.deadline.slice(0, 10)})` : ""}`,
+            ];
+            if (p.description?.trim()) {
+              parts.push(
+                `  Description: ${p.description.trim().slice(0, 150)}`,
+              );
+            }
+            parts.push(
+              `  Tasks linked: ${p.taskIds.length}, Notes linked: ${p.noteIds.length}`,
+            );
+            return parts.join("\n");
+          })
+          .join("\n")
+      : null;
+
   const meetingLines: string[] = [];
   if (context.meetingSessions) {
     const { active, completed } = context.meetingSessions;
@@ -997,10 +1306,12 @@ export function buildLunaSystemPrompt(context: {
     `You are Luna, the smart and friendly AI assistant built into Orbit — a personal productivity app for managing tasks, notes, and meetings. Today's date is ${now.slice(0, 10)}.`,
     "",
     "Your capabilities:",
-    "- Answer questions about the user's tasks, notes, priorities, schedule, and meeting sessions",
+    "- Answer questions about the user's tasks, notes, projects, priorities, schedule, and meeting sessions",
     "- Create new tasks (with sub-tasks, priority, and due date) and notes using the provided tools",
+    "- Update existing tasks (title, description, priority, due date) and notes (title, content) using the provided tools",
     "- Archive or mark tasks as complete using the provided tools",
     "- Delete notes when explicitly asked",
+    "- Create new projects and link existing tasks to projects",
     "- Apply writing assistant transformations to any text (improve, fix grammar, rephrase, make formal/casual, expand, shorten, convert to bullets, continue writing, or format as email)",
     "- Start a new meeting session, add entries to the active meeting, and end/discard it",
     "- Clear and regenerate AI categories for tasks or notes",
@@ -1014,22 +1325,24 @@ export function buildLunaSystemPrompt(context: {
     "- Be concise but thorough. Use markdown formatting (bold, lists, headers) when it helps readability.",
     "- When creating tasks, write clear action-oriented titles starting with verbs. Set appropriate priorities and due dates when context allows.",
     "- When creating notes, use markdown formatting for the content body.",
-    "- For archive_task, complete_task, and delete_note, use the exact task/note title as it appears in the list below.",
+    "- For archive_task, complete_task, delete_note, update_task, and update_note — use the exact task/note title as it appears in the list below.",
+    "- For link_task_to_project and link_note_to_project — match on the task/note title and project name from the lists below.",
     "- For transform_text, call the tool with the user's text and the appropriate mode, then present the result in your reply.",
     "- If the user asks for multiple deliverables or actions in one message, complete all of them in the same turn before giving your final reply.",
     "- Use tools as many times as needed. Do not stop after the first tool call if the user asked for additional tasks, notes, or other creations.",
-    "- Before your final reply, verify that every explicit create, add, save, schedule, archive, complete, or delete request from the latest user message has been handled.",
+    "- Before your final reply, verify that every explicit create, add, save, schedule, archive, complete, delete, update, or link request from the latest user message has been handled.",
     "- After using a tool, briefly confirm what was done.",
     "- If the user's request is ambiguous, ask a clarifying question rather than guessing.",
     "- Be warm and encouraging but not overly verbose.",
     "",
-    `The user currently has ${context.tasks.filter((t) => !t.completed).length} open task(s), ${context.tasks.filter((t) => t.completed).length} completed task(s), and ${context.notes.length} note(s).`,
+    `The user currently has ${context.tasks.filter((t) => !t.completed).length} open task(s), ${context.tasks.filter((t) => t.completed).length} completed task(s), ${context.notes.length} note(s), and ${context.projects?.length ?? 0} project(s).`,
     context.tasks.length > 0
       ? `\nTasks (open first, then completed):\n${taskLines}`
       : "",
     context.notes.length > 0
       ? `\nNotes (most recently updated first):\n${noteLines}`
       : "",
+    projectLines ? `\nProjects:\n${projectLines}` : "",
     meetingLines.length > 0
       ? `\nMeeting Mode:\n${meetingLines.join("\n")}`
       : "",

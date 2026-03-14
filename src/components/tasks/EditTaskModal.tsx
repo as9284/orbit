@@ -14,11 +14,14 @@ import {
   Circle,
   CheckCircle2,
   GripVertical,
+  Sparkles,
 } from "lucide-react";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import { DatePicker } from "../ui/DatePicker";
 import type { Task, SubTask } from "../../types/database.types";
 import type { CreateTaskData, SubTaskInput } from "../../hooks/useTasks";
+import { suggestSubTasks } from "../../lib/openrouter";
+import { isFeatureReady } from "../../lib/ai";
 
 // Local subtask type with a stable local id for drag/animation tracking
 type LocalSubTask = SubTaskInput & { _lid: string };
@@ -78,6 +81,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
   const [newSubTask, setNewSubTask] = useState("");
   const [errors, setErrors] = useState<{ title?: string; desc?: string }>({});
   const [loading, setLoading] = useState(false);
+  const [suggestingSubTasks, setSuggestingSubTasksState] = useState(false);
 
   // Drag state
   const [dragLid, setDragLid] = useState<string | null>(null);
@@ -106,6 +110,7 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
       setDragLid(null);
       setDragOverInfo(null);
       setCompletingLids(new Set());
+      setSuggestingSubTasksState(false);
       fetchSubTasks(task.id).then((sts) => {
         setSubTasks(
           sts.map((s) => ({
@@ -141,6 +146,26 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
 
   const removeSubTask = (lid: string) => {
     setSubTasks((prev) => prev.filter((s) => s._lid !== lid));
+  };
+
+  const aiReady = isFeatureReady("lunaChat");
+
+  const handleSuggestSubTasks = async () => {
+    if (!title.trim() || suggestingSubTasks) return;
+    setSuggestingSubTasksState(true);
+    const result = await suggestSubTasks(title, desc);
+    setSuggestingSubTasksState(false);
+    if (result.subTasks.length > 0) {
+      const existing = new Set(subTasks.map((s) => s.title.toLowerCase()));
+      const newOnes = result.subTasks
+        .filter((s) => !existing.has(s.toLowerCase()))
+        .map((t) => ({
+          title: t,
+          completed: false,
+          _lid: crypto.randomUUID(),
+        }));
+      setSubTasks((prev) => [...prev, ...newOnes]);
+    }
   };
 
   const toggleSubTask = (lid: string) => {
@@ -320,6 +345,22 @@ export function EditTaskModal({ task, onClose, onSave, fetchSubTasks }: Props) {
                   </span>
                 )}
               </span>
+            )}
+            {aiReady && title.trim() && (
+              <button
+                type="button"
+                onClick={handleSuggestSubTasks}
+                disabled={suggestingSubTasks}
+                className={`flex items-center gap-1 text-[10px] text-violet-400/60 hover:text-violet-300 transition-colors disabled:opacity-40 ${subTasks.length > 0 ? "" : "ml-auto"}`}
+                title="Suggest sub-tasks with Luna"
+              >
+                {suggestingSubTasks ? (
+                  <Sparkles size={10} className="animate-pulse" />
+                ) : (
+                  <Sparkles size={10} />
+                )}
+                Suggest
+              </button>
             )}
           </div>
 

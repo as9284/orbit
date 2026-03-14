@@ -13,9 +13,12 @@ import {
   X,
   ListChecks,
   GripVertical,
+  Sparkles,
 } from "lucide-react";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import type { CreateTaskData, SubTaskInput } from "../../hooks/useTasks";
+import { suggestSubTasks } from "../../lib/openrouter";
+import { isFeatureReady } from "../../lib/ai";
 
 // Local subtask with stable local id for drag tracking
 type LocalSubTaskCreate = { title: string; _lid: string };
@@ -71,6 +74,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
     dueDate?: string;
   }>({});
   const [loading, setLoading] = useState(false);
+  const [suggestingSubTasks, setSuggestingSubTasks] = useState(false);
 
   // Drag state for subtask reordering
   const [dragLid, setDragLid] = useState<string | null>(null);
@@ -78,6 +82,8 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
     lid: string;
     insertBefore: boolean;
   } | null>(null);
+
+  const aiReady = isFeatureReady("lunaChat");
 
   const reset = () => {
     setTitle("");
@@ -89,6 +95,7 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
     setErrors({});
     setDragLid(null);
     setDragOverInfo(null);
+    setSuggestingSubTasks(false);
   };
 
   const handleClose = () => {
@@ -104,6 +111,20 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
       { title: text, _lid: crypto.randomUUID() },
     ]);
     setNewSubTask("");
+  };
+
+  const handleSuggestSubTasks = async () => {
+    if (!title.trim() || suggestingSubTasks) return;
+    setSuggestingSubTasks(true);
+    const result = await suggestSubTasks(title, desc);
+    setSuggestingSubTasks(false);
+    if (result.subTasks.length > 0) {
+      const existing = new Set(subTasks.map((s) => s.title.toLowerCase()));
+      const newOnes = result.subTasks
+        .filter((s) => !existing.has(s.toLowerCase()))
+        .map((t) => ({ title: t, _lid: crypto.randomUUID() }));
+      setSubTasks((prev) => [...prev, ...newOnes]);
+    }
   };
 
   const removeSubTask = (lid: string) => {
@@ -254,6 +275,22 @@ export function CreateTaskModal({ open, onClose, onCreate }: Props) {
               <span className="text-[10px] text-white/15 ml-auto">
                 drag to reorder
               </span>
+            )}
+            {aiReady && title.trim() && (
+              <button
+                type="button"
+                onClick={handleSuggestSubTasks}
+                disabled={suggestingSubTasks}
+                className="ml-auto flex items-center gap-1 text-[10px] text-violet-400/60 hover:text-violet-300 transition-colors disabled:opacity-40"
+                title="Suggest sub-tasks with Luna"
+              >
+                {suggestingSubTasks ? (
+                  <Sparkles size={10} className="animate-pulse" />
+                ) : (
+                  <Sparkles size={10} />
+                )}
+                Suggest
+              </button>
             )}
           </div>
           {subTasks.length > 0 && (

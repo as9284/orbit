@@ -20,6 +20,7 @@ import { CreateProjectModal } from "../components/projects/CreateProjectModal";
 import { EditProjectModal } from "../components/projects/EditProjectModal";
 import { ProjectDetailModal } from "../components/projects/ProjectDetailModal";
 import type { Project } from "../types/database.types";
+import type { AiTaskDraft } from "../lib/openrouter";
 
 // ── Color helpers ──────────────────────────────────────────────────────────────
 
@@ -375,9 +376,32 @@ export function ProjectsPage() {
       <CreateProjectModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreate={(data) => {
-          projectsApi.createProject(data);
-          toast.success("Project created");
+        onCreate={async (data, starterTasks?: AiTaskDraft[]) => {
+          const project = projectsApi.createProject(data);
+          if (starterTasks && starterTasks.length > 0) {
+            for (const draft of starterTasks) {
+              const taskId = await tasksApi.createTask({
+                title: draft.title,
+                description: draft.description || undefined,
+                priority: draft.priority,
+              });
+              if (taskId) {
+                if (draft.subTasks.length > 0) {
+                  await tasksApi.saveSubTasks(
+                    taskId,
+                    draft.subTasks.map((t) => ({ title: t })),
+                    [],
+                  );
+                }
+                projectsApi.linkTask(project.id, taskId);
+              }
+            }
+            toast.success(
+              `Project created with ${starterTasks.length} starter task${starterTasks.length !== 1 ? "s" : ""}`,
+            );
+          } else {
+            toast.success("Project created");
+          }
         }}
       />
 
