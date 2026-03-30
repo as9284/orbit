@@ -2,7 +2,7 @@
 
 const STORAGE_KEY = "orbit:ai:settings";
 
-export type ProviderId = "openrouter" | "deepseek";
+export type ProviderId = "openrouter" | "deepseek" | "gemini";
 
 export interface ModelConfig {
   id: string;
@@ -83,11 +83,34 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     ],
     defaultModel: "deepseek-chat",
   },
+  gemini: {
+    id: "gemini",
+    label: "Google Gemini",
+    description: "Use Gemini models directly via Google AI Studio",
+    keyPlaceholder: "AIza…",
+    keyPrefix: "AIza",
+    docsUrl: "https://aistudio.google.com/apikey",
+    docsSteps: [
+      "Go to aistudio.google.com/apikey and sign in",
+      "Click Create API key",
+      "Select or create a Google Cloud project",
+      "Copy the key and paste it above",
+    ],
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    models: [
+      {
+        id: "gemini-3.1-flash-lite-preview",
+        label: "Gemini 3.1 Flash Lite",
+      },
+    ],
+    defaultModel: "gemini-3.1-flash-lite-preview",
+  },
 };
 
 export const PROVIDER_LIST: ProviderConfig[] = [
   PROVIDERS.openrouter,
   PROVIDERS.deepseek,
+  PROVIDERS.gemini,
 ];
 
 // ── Feature toggles ──────────────────────────────────────────────────────────
@@ -125,10 +148,11 @@ export interface AiSettings {
 function defaultSettings(): AiSettings {
   return {
     provider: "openrouter",
-    keys: { openrouter: "", deepseek: "" },
+    keys: { openrouter: "", deepseek: "", gemini: "" },
     model: {
       openrouter: PROVIDERS.openrouter.defaultModel,
       deepseek: PROVIDERS.deepseek.defaultModel,
+      gemini: PROVIDERS.gemini.defaultModel,
     },
     features: { ...DEFAULT_FEATURES },
   };
