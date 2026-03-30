@@ -1392,7 +1392,10 @@ export async function streamLunaChat(
       : [settings.model[settings.provider]];
 
   const isDeepSeek = settings.provider === "deepseek";
-  const thinkingEnabled = isDeepSeek && !!options?.thinkingEnabled;
+  const isGemini = settings.provider === "gemini";
+  // Gemini always uses thinking; DeepSeek only when the user enables it
+  const thinkingEnabled =
+    (isDeepSeek && !!options?.thinkingEnabled) || isGemini;
 
   for (const model of models) {
     try {
@@ -1433,7 +1436,11 @@ export async function streamLunaChat(
 
         if (allowThinking) {
           // Thinking mode: no temperature/top_p, higher max_tokens for CoT
-          body.thinking = { type: "enabled" };
+          if (isGemini) {
+            body.reasoning_effort = "medium";
+          } else {
+            body.thinking = { type: "enabled" };
+          }
           body.max_tokens = 8192;
         } else {
           body.temperature = 0.5;
@@ -1474,6 +1481,7 @@ export async function streamLunaChat(
               callbacks,
               signal,
               allowThinking,
+              isGemini,
             );
           }
           modelFailed = true;
@@ -1656,6 +1664,7 @@ async function nonStreamingFallback(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
   thinkingEnabled?: boolean,
+  isGemini?: boolean,
 ): Promise<string | null> {
   type ApiMessage =
     | { role: "system" | "user"; content: string }
@@ -1677,7 +1686,11 @@ async function nonStreamingFallback(
       tools: LUNA_TOOLS,
     };
     if (thinkingEnabled) {
-      body.thinking = { type: "enabled" };
+      if (isGemini) {
+        body.reasoning_effort = "medium";
+      } else {
+        body.thinking = { type: "enabled" };
+      }
       body.max_tokens = 8192;
     } else {
       body.temperature = 0.5;
@@ -1704,6 +1717,7 @@ async function nonStreamingFallback(
           const body = buildBody(currentMessages);
           if (!allowThinking) {
             delete body.thinking;
+            delete body.reasoning_effort;
             body.temperature = 0.5;
             body.max_tokens = 1024;
           }

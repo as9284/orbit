@@ -101,6 +101,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
       {
         id: "gemini-3.1-flash-lite-preview",
         label: "Gemini 3.1 Flash Lite",
+        supportsThinking: true,
       },
     ],
     defaultModel: "gemini-3.1-flash-lite-preview",
