@@ -834,7 +834,7 @@ const LUNA_TOOLS: LunaTool[] = [
     function: {
       name: "create_task",
       description:
-        "Create a new task for the user. Use when the user asks to create, add, or schedule a task. Call this multiple times when the user requests multiple tasks or combined task-plus-note workflows.",
+        "Create a new task for the user. Use when the user asks to create, add, or schedule a task. Include project_name to create the task directly inside a project. Call this multiple times when the user requests multiple tasks or combined task-plus-note workflows.",
       parameters: {
         type: "object",
         properties: {
@@ -860,6 +860,11 @@ const LUNA_TOOLS: LunaTool[] = [
             items: { type: "string" },
             description: "Optional list of sub-task titles",
           },
+          project_name: {
+            type: "string",
+            description:
+              "Optional project name to link this task to immediately after creation",
+          },
         },
         required: ["title"],
       },
@@ -870,12 +875,17 @@ const LUNA_TOOLS: LunaTool[] = [
     function: {
       name: "create_note",
       description:
-        "Create a new note for the user. Use when the user asks to write down, save, remember, or jot something. Call this multiple times when the user requests multiple notes or a note alongside another action.",
+        "Create a new note for the user. Use when the user asks to write down, save, remember, or jot something. Include project_name to create the note directly inside a project. Call this multiple times when the user requests multiple notes or a note alongside another action.",
       parameters: {
         type: "object",
         properties: {
           title: { type: "string", description: "Note title" },
           content: { type: "string", description: "Note body in markdown" },
+          project_name: {
+            type: "string",
+            description:
+              "Optional project name to link this note to immediately after creation",
+          },
         },
         required: ["title"],
       },
@@ -1307,11 +1317,12 @@ export function buildLunaSystemPrompt(context: {
     "",
     "Your capabilities:",
     "- Answer questions about the user's tasks, notes, projects, priorities, schedule, and meeting sessions",
-    "- Create new tasks (with sub-tasks, priority, and due date) and notes using the provided tools",
+    "- Create new tasks (with sub-tasks, priority, due date, and optional project) and notes using the provided tools",
     "- Update existing tasks (title, description, priority, due date) and notes (title, content) using the provided tools",
     "- Archive or mark tasks as complete using the provided tools",
     "- Delete notes when explicitly asked",
-    "- Create new projects and link existing tasks to projects",
+    "- Create new projects and link existing tasks or notes to projects",
+    "- When the user asks to create a task or note inside a specific project, pass project_name to create_task or create_note to link it automatically",
     "- Apply writing assistant transformations to any text (improve, fix grammar, rephrase, make formal/casual, expand, shorten, convert to bullets, continue writing, or format as email)",
     "- Start a new meeting session, add entries to the active meeting, and end/discard it",
     "- Clear and regenerate AI categories for tasks or notes",
@@ -1326,6 +1337,7 @@ export function buildLunaSystemPrompt(context: {
     "- When creating tasks, write clear action-oriented titles starting with verbs. Set appropriate priorities and due dates when context allows.",
     "- When creating notes, use markdown formatting for the content body.",
     "- For archive_task, complete_task, delete_note, update_task, and update_note — use the exact task/note title as it appears in the list below.",
+    "- For create_task and create_note, pass project_name to link the new item to a project in one step instead of calling link_task_to_project separately.",
     "- For link_task_to_project and link_note_to_project — match on the task/note title and project name from the lists below.",
     "- For transform_text, call the tool with the user's text and the appropriate mode, then present the result in your reply.",
     "- If the user asks for multiple deliverables or actions in one message, complete all of them in the same turn before giving your final reply.",
@@ -1393,9 +1405,9 @@ export async function streamLunaChat(
 
   const isDeepSeek = settings.provider === "deepseek";
   const isGemini = settings.provider === "gemini";
-  // Gemini always uses thinking; DeepSeek only when the user enables it
+  // Both DeepSeek and Gemini support thinking; respect the user's toggle
   const thinkingEnabled =
-    (isDeepSeek && !!options?.thinkingEnabled) || isGemini;
+    (isDeepSeek || isGemini) && !!options?.thinkingEnabled;
 
   for (const model of models) {
     try {
@@ -1460,7 +1472,6 @@ export async function streamLunaChat(
         if (!res.ok) {
           const errText = await res.text();
           if (
-            isDeepSeek &&
             allowThinking &&
             shouldRetryWithoutThinking(res.status, errText)
           ) {

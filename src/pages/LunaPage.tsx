@@ -32,6 +32,7 @@ import {
   hasApiKey,
   isFeatureReady,
   activeModelSupportsThinking,
+  getAiSettings,
 } from "../lib/ai";
 import {
   buildLunaSystemPrompt,
@@ -95,7 +96,9 @@ export function LunaPage() {
   });
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [thinkingMode, setThinkingMode] = useState(false);
+  const [thinkingMode, setThinkingMode] = useState(
+    () => getAiSettings().provider === "gemini",
+  );
   const abortRef = useRef<AbortController | null>(null);
   const activeAssistantMessageIdRef = useRef<string | null>(null);
   const activeAssistantHasOutputRef = useRef(false);
@@ -390,6 +393,9 @@ export function LunaPage() {
                     title: String(s),
                   }))
                 : [];
+              const taskProjectName = args.project_name
+                ? String(args.project_name)
+                : undefined;
               const statusId = createToolStatusMessage(
                 "create_task",
                 `Creating task: ${title}`,
@@ -405,6 +411,19 @@ export function LunaPage() {
               if (taskId && subTasks.length > 0) {
                 await tasksApi.saveSubTasks(taskId, subTasks, []);
               }
+              if (taskId && taskProjectName) {
+                const proj =
+                  projectsApi.projects.find(
+                    (p) =>
+                      p.name.toLowerCase() === taskProjectName.toLowerCase(),
+                  ) ??
+                  projectsApi.projects.find((p) =>
+                    p.name
+                      .toLowerCase()
+                      .includes(taskProjectName.toLowerCase()),
+                  );
+                if (proj) projectsApi.linkTask(proj.id, taskId);
+              }
               const ok = !!taskId;
               updateToolStatusMessage(statusId, {
                 tool: "create_task",
@@ -414,13 +433,20 @@ export function LunaPage() {
               if (ok) toast.success(`Task created: ${title}`);
               else toast.error("Failed to create task");
               return ok
-                ? `Task created successfully: "${title}"`
+                ? `Task created successfully: "${title}"${
+                    taskProjectName
+                      ? ` (linked to project "${taskProjectName}")`
+                      : ""
+                  }`
                 : "Failed to create task";
             }
 
             if (name === "create_note") {
               const title = String(args.title ?? "Untitled note");
               const content = args.content ? String(args.content) : undefined;
+              const noteProjectName = args.project_name
+                ? String(args.project_name)
+                : undefined;
               const statusId = createToolStatusMessage(
                 "create_note",
                 `Making note: ${title}`,
@@ -430,6 +456,19 @@ export function LunaPage() {
                 title,
                 content,
               });
+              if (noteId && noteProjectName) {
+                const proj =
+                  projectsApi.projects.find(
+                    (p) =>
+                      p.name.toLowerCase() === noteProjectName.toLowerCase(),
+                  ) ??
+                  projectsApi.projects.find((p) =>
+                    p.name
+                      .toLowerCase()
+                      .includes(noteProjectName.toLowerCase()),
+                  );
+                if (proj) projectsApi.linkNote(proj.id, noteId);
+              }
               const ok = !!noteId;
               updateToolStatusMessage(statusId, {
                 tool: "create_note",
@@ -439,7 +478,11 @@ export function LunaPage() {
               if (ok) toast.success(`Note created: ${title}`);
               else toast.error("Failed to create note");
               return ok
-                ? `Note created successfully: "${title}"`
+                ? `Note created successfully: "${title}"${
+                    noteProjectName
+                      ? ` (linked to project "${noteProjectName}")`
+                      : ""
+                  }`
                 : "Failed to create note";
             }
 
