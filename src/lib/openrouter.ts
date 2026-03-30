@@ -179,7 +179,7 @@ async function requestAiText(
   const models =
     settings.provider === "openrouter"
       ? getOpenRouterFallbackModels()
-      : [settings.model.deepseek];
+      : [settings.model[settings.provider]];
 
   let lastError: string | null = null;
 
@@ -1389,7 +1389,7 @@ export async function streamLunaChat(
   const models =
     settings.provider === "openrouter"
       ? getOpenRouterFallbackModels()
-      : [settings.model.deepseek];
+      : [settings.model[settings.provider]];
 
   const isDeepSeek = settings.provider === "deepseek";
   const thinkingEnabled = isDeepSeek && !!options?.thinkingEnabled;
