@@ -1191,6 +1191,136 @@ const LUNA_TOOLS: LunaTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "unarchive_task",
+      description:
+        "Restore an archived task back to the active task list. Use when the user asks to unarchive, restore, or bring back an archived task.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_title: {
+            type: "string",
+            description:
+              "The exact title of the archived task to restore as shown in the archived tasks list",
+          },
+        },
+        required: ["task_title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_task",
+      description:
+        "Permanently delete a task. Works on both active and archived tasks. Only use when the user explicitly asks to permanently delete or remove a task forever.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_title: {
+            type: "string",
+            description: "The exact title of the task to permanently delete",
+          },
+        },
+        required: ["task_title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_project",
+      description:
+        "Delete a project. This removes the project but does not delete the tasks or notes linked to it. Use when the user asks to delete or remove a project.",
+      parameters: {
+        type: "object",
+        properties: {
+          project_name: {
+            type: "string",
+            description: "The name of the project to delete",
+          },
+        },
+        required: ["project_name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_project",
+      description:
+        "Update an existing project's name, description, or deadline. Use when the user asks to edit, rename, or modify a project.",
+      parameters: {
+        type: "object",
+        properties: {
+          project_name: {
+            type: "string",
+            description: "The current name of the project to update",
+          },
+          new_name: {
+            type: "string",
+            description: "New project name (omit to keep existing)",
+          },
+          description: {
+            type: "string",
+            description: "New description (omit to keep existing)",
+          },
+          deadline: {
+            type: "string",
+            description:
+              "New deadline in YYYY-MM-DD format, or empty string to clear it (omit to keep existing)",
+          },
+        },
+        required: ["project_name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "unlink_task_from_project",
+      description:
+        "Remove a task from a project without deleting either. Use when the user asks to remove, detach, or unlink a task from a project.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_title: {
+            type: "string",
+            description: "The title of the task to unlink",
+          },
+          project_name: {
+            type: "string",
+            description: "The name of the project to unlink the task from",
+          },
+        },
+        required: ["task_title", "project_name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "unlink_note_from_project",
+      description:
+        "Remove a note from a project without deleting either. Use when the user asks to remove, detach, or unlink a note from a project.",
+      parameters: {
+        type: "object",
+        properties: {
+          note_title: {
+            type: "string",
+            description: "The title of the note to unlink",
+          },
+          project_name: {
+            type: "string",
+            description: "The name of the project to unlink the note from",
+          },
+        },
+        required: ["note_title", "project_name"],
+      },
+    },
+  },
 ];
 
 export function buildLunaSystemPrompt(context: {
@@ -1199,6 +1329,12 @@ export function buildLunaSystemPrompt(context: {
     description?: string | null;
     priority: string;
     due_date?: string | null;
+    completed: boolean;
+  }[];
+  archivedTasks?: {
+    title: string;
+    description?: string | null;
+    priority: string;
     completed: boolean;
   }[];
   notes: { title: string; content?: string | null; updated_at?: string }[];
@@ -1315,6 +1451,25 @@ export function buildLunaSystemPrompt(context: {
     }
   }
 
+  const archivedLines =
+    context.archivedTasks && context.archivedTasks.length > 0
+      ? context.archivedTasks
+          .slice(0, 30)
+          .map((t) => {
+            const parts: string[] = [
+              `- ${t.title} (${t.priority}${t.completed ? ", completed" : ""})`,
+            ];
+            if (t.description?.trim()) {
+              const snippet = t.description.trim().slice(0, 120);
+              parts.push(
+                `  Description: ${snippet}${t.description.trim().length > 120 ? "…" : ""}`,
+              );
+            }
+            return parts.join("\n");
+          })
+          .join("\n")
+      : null;
+
   return [
     `You are Luna, the smart and friendly AI assistant built into Orbit — a personal productivity app for managing tasks, notes, and meetings. Today's date is ${now.slice(0, 10)}.`,
     "",
@@ -1323,8 +1478,10 @@ export function buildLunaSystemPrompt(context: {
     "- Create new tasks (with sub-tasks, priority, due date, and optional project) and notes using the provided tools",
     "- Update existing tasks (title, description, priority, due date) and notes (title, content) using the provided tools",
     "- Archive or mark tasks as complete using the provided tools",
-    "- Delete notes when explicitly asked",
-    "- Create new projects and link existing tasks or notes to projects",
+    "- Unarchive tasks to restore them from the archive back to the active list",
+    "- Permanently delete tasks (active or archived) and notes when explicitly asked",
+    "- Create, update, and delete projects",
+    "- Link and unlink tasks or notes to/from projects",
     "- When the user asks to create a task or note inside a specific project, pass project_name to create_task or create_note to link it automatically",
     "- Apply writing assistant transformations to any text (improve, fix grammar, rephrase, make formal/casual, expand, shorten, convert to bullets, continue writing, or format as email)",
     "- Start a new meeting session, add entries to the active meeting, and end/discard it",
@@ -1339,21 +1496,25 @@ export function buildLunaSystemPrompt(context: {
     "- Be concise but thorough. Use markdown formatting (bold, lists, headers) when it helps readability.",
     "- When creating tasks, write clear action-oriented titles starting with verbs. Set appropriate priorities and due dates when context allows.",
     "- When creating notes, use markdown formatting for the content body.",
-    "- For archive_task, complete_task, delete_note, update_task, and update_note — use the exact task/note title as it appears in the list below.",
+    "- For archive_task, complete_task, delete_note, delete_task, update_task, and update_note — use the exact task/note title as it appears in the lists below.",
+    "- For unarchive_task — use the exact title from the Archived Tasks list below.",
+    "- For delete_task — check both active tasks and archived tasks lists to find a match.",
+    "- For update_project, delete_project — use the exact project name from the list below.",
     "- For create_task and create_note, pass project_name to link the new item to a project in one step instead of calling link_task_to_project separately.",
-    "- For link_task_to_project and link_note_to_project — match on the task/note title and project name from the lists below.",
+    "- For link/unlink tools — match on the task/note title and project name from the lists below.",
     "- For transform_text, call the tool with the user's text and the appropriate mode, then present the result in your reply.",
     "- If the user asks for multiple deliverables or actions in one message, complete all of them in the same turn before giving your final reply.",
     "- Use tools as many times as needed. Do not stop after the first tool call if the user asked for additional tasks, notes, or other creations.",
-    "- Before your final reply, verify that every explicit create, add, save, schedule, archive, complete, delete, update, or link request from the latest user message has been handled.",
+    "- Before your final reply, verify that every explicit create, add, save, schedule, archive, unarchive, complete, delete, update, link, or unlink request from the latest user message has been handled.",
     "- After using a tool, briefly confirm what was done.",
     "- If the user's request is ambiguous, ask a clarifying question rather than guessing.",
     "- Be warm and encouraging but not overly verbose.",
     "",
-    `The user currently has ${context.tasks.filter((t) => !t.completed).length} open task(s), ${context.tasks.filter((t) => t.completed).length} completed task(s), ${context.notes.length} note(s), and ${context.projects?.length ?? 0} project(s).`,
+    `The user currently has ${context.tasks.filter((t) => !t.completed).length} open task(s), ${context.tasks.filter((t) => t.completed).length} completed task(s), ${context.archivedTasks?.length ?? 0} archived task(s), ${context.notes.length} note(s), and ${context.projects?.length ?? 0} project(s).`,
     context.tasks.length > 0
       ? `\nTasks (open first, then completed):\n${taskLines}`
       : "",
+    archivedLines ? `\nArchived Tasks:\n${archivedLines}` : "",
     context.notes.length > 0
       ? `\nNotes (most recently updated first):\n${noteLines}`
       : "",

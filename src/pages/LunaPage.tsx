@@ -19,9 +19,12 @@ import {
   Sparkles,
   ChevronDown,
   Archive,
+  ArchiveRestore,
   PenLine,
   Video,
   RefreshCw,
+  FolderOpen,
+  Unlink,
 } from "lucide-react";
 import { useTasksApi, useNotesApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
@@ -76,6 +79,12 @@ export function LunaPage() {
   const meetingApi = useMeetingSessions(user?.id);
   const { activeSession, sessions: meetingSessions } = meetingApi;
   const userName: string = user?.user_metadata?.full_name ?? user?.email ?? "";
+
+  // Fetch archived tasks so Luna can reference & unarchive them
+  useEffect(() => {
+    if (encryptionKey) tasksApi.fetchArchivedTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [encryptionKey]);
 
   const chatStorageKey = `${CHAT_STORAGE_PREFIX}:${user?.id ?? "_"}`;
 
@@ -280,6 +289,12 @@ export function LunaPage() {
               description: t.description,
               priority: t.priority,
               due_date: t.due_date,
+              completed: t.completed,
+            })),
+            archivedTasks: tasksApi.archivedTasks.map((t) => ({
+              title: t.title,
+              description: t.description,
+              priority: t.priority,
               completed: t.completed,
             })),
             notes: notesApi.notes.map((n) => ({
@@ -926,6 +941,240 @@ export function LunaPage() {
               return `Note "${note.title}" linked to project "${project.name}"`;
             }
 
+            if (name === "unarchive_task") {
+              const taskTitle = String(args.task_title ?? "");
+              const match =
+                tasksApi.archivedTasks.find(
+                  (t) => t.title.toLowerCase() === taskTitle.toLowerCase(),
+                ) ??
+                tasksApi.archivedTasks.find((t) =>
+                  t.title.toLowerCase().includes(taskTitle.toLowerCase()),
+                );
+              if (!match) {
+                return `Could not find an archived task matching "${taskTitle}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "unarchive_task",
+                `Restoring: ${match.title}`,
+              );
+              await waitForNextPaint();
+              const ok = await tasksApi.unarchiveTask(match.id);
+              updateToolStatusMessage(statusId, {
+                tool: "unarchive_task",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Restored task: ${match.title}`
+                  : "Failed to restore task",
+              });
+              if (ok) toast.success(`Task restored: ${match.title}`);
+              else toast.error("Failed to restore task");
+              return ok
+                ? `Task restored from archive: "${match.title}"`
+                : "Failed to restore task from archive";
+            }
+
+            if (name === "delete_task") {
+              const taskTitle = String(args.task_title ?? "");
+              // Check active tasks first, then archived
+              const activeMatch =
+                tasksApi.activeTasks.find(
+                  (t) => t.title.toLowerCase() === taskTitle.toLowerCase(),
+                ) ??
+                tasksApi.activeTasks.find((t) =>
+                  t.title.toLowerCase().includes(taskTitle.toLowerCase()),
+                );
+              const archivedMatch =
+                tasksApi.archivedTasks.find(
+                  (t) => t.title.toLowerCase() === taskTitle.toLowerCase(),
+                ) ??
+                tasksApi.archivedTasks.find((t) =>
+                  t.title.toLowerCase().includes(taskTitle.toLowerCase()),
+                );
+              const match = activeMatch ?? archivedMatch;
+              if (!match) {
+                return `Could not find a task matching "${taskTitle}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "delete_task",
+                `Deleting task: ${match.title}`,
+              );
+              await waitForNextPaint();
+              let ok: boolean;
+              if (activeMatch) {
+                // Archive first, then delete forever
+                ok = await tasksApi.archiveTask(match.id);
+                if (ok) ok = await tasksApi.deleteForever(match.id);
+              } else {
+                ok = await tasksApi.deleteForever(match.id);
+              }
+              updateToolStatusMessage(statusId, {
+                tool: "delete_task",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Deleted task: ${match.title}`
+                  : "Failed to delete task",
+              });
+              if (ok) toast.success(`Task deleted: ${match.title}`);
+              else toast.error("Failed to delete task");
+              return ok
+                ? `Task permanently deleted: "${match.title}"`
+                : "Failed to delete task";
+            }
+
+            if (name === "delete_project") {
+              const projectName = String(args.project_name ?? "");
+              const project =
+                projectsApi.projects.find(
+                  (p) => p.name.toLowerCase() === projectName.toLowerCase(),
+                ) ??
+                projectsApi.projects.find((p) =>
+                  p.name.toLowerCase().includes(projectName.toLowerCase()),
+                );
+              if (!project) {
+                return `Could not find a project matching "${projectName}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "delete_project",
+                `Deleting project: ${project.name}`,
+              );
+              await waitForNextPaint();
+              const ok = projectsApi.deleteProject(project.id);
+              updateToolStatusMessage(statusId, {
+                tool: "delete_project",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Deleted project: ${project.name}`
+                  : "Failed to delete project",
+              });
+              if (ok) toast.success(`Project deleted: ${project.name}`);
+              else toast.error("Failed to delete project");
+              return ok
+                ? `Project deleted: "${project.name}" (linked tasks and notes were kept)`
+                : "Failed to delete project";
+            }
+
+            if (name === "update_project") {
+              const projectName = String(args.project_name ?? "");
+              const project =
+                projectsApi.projects.find(
+                  (p) => p.name.toLowerCase() === projectName.toLowerCase(),
+                ) ??
+                projectsApi.projects.find((p) =>
+                  p.name.toLowerCase().includes(projectName.toLowerCase()),
+                );
+              if (!project) {
+                return `Could not find a project matching "${projectName}"`;
+              }
+              const updates: {
+                name?: string;
+                description?: string;
+                deadline?: string | null;
+              } = {};
+              if (args.new_name) updates.name = String(args.new_name);
+              if (args.description !== undefined)
+                updates.description = String(args.description);
+              if (args.deadline !== undefined)
+                updates.deadline =
+                  args.deadline === "" ? null : String(args.deadline);
+              const statusId = createToolStatusMessage(
+                "update_project",
+                `Updating project: ${project.name}`,
+              );
+              await waitForNextPaint();
+              const ok = projectsApi.updateProject(project.id, updates);
+              updateToolStatusMessage(statusId, {
+                tool: "update_project",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Updated project: ${updates.name ?? project.name}`
+                  : "Failed to update project",
+              });
+              if (ok)
+                toast.success(
+                  `Project updated: ${updates.name ?? project.name}`,
+                );
+              else toast.error("Failed to update project");
+              return ok
+                ? `Project updated: "${updates.name ?? project.name}"`
+                : "Failed to update project";
+            }
+
+            if (name === "unlink_task_from_project") {
+              const taskTitle = String(args.task_title ?? "");
+              const projectName = String(args.project_name ?? "");
+              const task =
+                tasksApi.activeTasks.find(
+                  (t) => t.title.toLowerCase() === taskTitle.toLowerCase(),
+                ) ??
+                tasksApi.activeTasks.find((t) =>
+                  t.title.toLowerCase().includes(taskTitle.toLowerCase()),
+                );
+              if (!task) {
+                return `Could not find an active task matching "${taskTitle}"`;
+              }
+              const project =
+                projectsApi.projects.find(
+                  (p) => p.name.toLowerCase() === projectName.toLowerCase(),
+                ) ??
+                projectsApi.projects.find((p) =>
+                  p.name.toLowerCase().includes(projectName.toLowerCase()),
+                );
+              if (!project) {
+                return `Could not find a project matching "${projectName}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "unlink_task_from_project",
+                `Unlinking "${task.title}" from "${project.name}"`,
+              );
+              await waitForNextPaint();
+              projectsApi.unlinkTask(project.id, task.id);
+              updateToolStatusMessage(statusId, {
+                tool: "unlink_task_from_project",
+                status: "success",
+                label: `Unlinked task from project: ${project.name}`,
+              });
+              toast.success(`Task unlinked from "${project.name}"`);
+              return `Task "${task.title}" unlinked from project "${project.name}"`;
+            }
+
+            if (name === "unlink_note_from_project") {
+              const noteTitle = String(args.note_title ?? "");
+              const projectName = String(args.project_name ?? "");
+              const note =
+                notesApi.notes.find(
+                  (n) => n.title.toLowerCase() === noteTitle.toLowerCase(),
+                ) ??
+                notesApi.notes.find((n) =>
+                  n.title.toLowerCase().includes(noteTitle.toLowerCase()),
+                );
+              if (!note) {
+                return `Could not find a note matching "${noteTitle}"`;
+              }
+              const project =
+                projectsApi.projects.find(
+                  (p) => p.name.toLowerCase() === projectName.toLowerCase(),
+                ) ??
+                projectsApi.projects.find((p) =>
+                  p.name.toLowerCase().includes(projectName.toLowerCase()),
+                );
+              if (!project) {
+                return `Could not find a project matching "${projectName}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "unlink_note_from_project",
+                `Unlinking "${note.title}" from "${project.name}"`,
+              );
+              await waitForNextPaint();
+              projectsApi.unlinkNote(project.id, note.id);
+              updateToolStatusMessage(statusId, {
+                tool: "unlink_note_from_project",
+                status: "success",
+                label: `Unlinked note from project: ${project.name}`,
+              });
+              toast.success(`Note unlinked from "${project.name}"`);
+              return `Note "${note.title}" unlinked from project "${project.name}"`;
+            }
+
             return "Unknown tool";
           },
           onDone: (fullText, reasoning) => {
@@ -1259,9 +1508,11 @@ function MessageBubble({ message }: { message: UIMessage }) {
                   <CheckCircle2 size={12} />
                 ) : tr.tool === "archive_task" ? (
                   <Archive size={12} />
+                ) : tr.tool === "unarchive_task" ? (
+                  <ArchiveRestore size={12} />
                 ) : tr.tool === "create_note" ? (
                   <StickyNote size={12} />
-                ) : tr.tool === "delete_note" ? (
+                ) : tr.tool === "delete_note" || tr.tool === "delete_task" ? (
                   <Trash2 size={12} />
                 ) : tr.tool === "transform_text" ? (
                   <PenLine size={12} />
@@ -1272,6 +1523,13 @@ function MessageBubble({ message }: { message: UIMessage }) {
                 ) : tr.tool === "recategorize_tasks" ||
                   tr.tool === "recategorize_notes" ? (
                   <RefreshCw size={12} />
+                ) : tr.tool === "create_project" ||
+                  tr.tool === "update_project" ||
+                  tr.tool === "delete_project" ? (
+                  <FolderOpen size={12} />
+                ) : tr.tool === "unlink_task_from_project" ||
+                  tr.tool === "unlink_note_from_project" ? (
+                  <Unlink size={12} />
                 ) : (
                   <StickyNote size={12} />
                 )}
