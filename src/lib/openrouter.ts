@@ -185,15 +185,21 @@ async function requestAiText(
 
   for (const model of models) {
     try {
+      const isGemini = settings.provider === "gemini";
+      const body: Record<string, unknown> = {
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: maxTokens,
+      };
+      // Gemini 3.x models always think — don't send temperature
+      if (!isGemini) {
+        body.temperature = 0.2;
+      }
+
       const res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: maxTokens,
-          temperature: 0.2,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -1026,7 +1032,6 @@ const LUNA_TOOLS: LunaTool[] = [
       parameters: {
         type: "object",
         properties: {},
-        required: [],
       },
     },
   },
@@ -1039,7 +1044,6 @@ const LUNA_TOOLS: LunaTool[] = [
       parameters: {
         type: "object",
         properties: {},
-        required: [],
       },
     },
   },
@@ -1052,7 +1056,6 @@ const LUNA_TOOLS: LunaTool[] = [
       parameters: {
         type: "object",
         properties: {},
-        required: [],
       },
     },
   },
@@ -1446,13 +1449,15 @@ export async function streamLunaChat(
           stream: true,
         };
 
-        if (allowThinking) {
+        if (isGemini) {
+          // Gemini 3.x always thinks – cannot be disabled.
+          // Use reasoning_effort to control depth; never send temperature.
+          body.reasoning_effort = allowThinking ? "medium" : "low";
+          body.max_tokens = allowThinking ? 8192 : 1024;
+          body.tool_choice = "auto";
+        } else if (allowThinking) {
           // Thinking mode: no temperature/top_p, higher max_tokens for CoT
-          if (isGemini) {
-            body.reasoning_effort = "medium";
-          } else {
-            body.thinking = { type: "enabled" };
-          }
+          body.thinking = { type: "enabled" };
           body.max_tokens = 8192;
         } else {
           body.temperature = 0.5;
@@ -1690,18 +1695,19 @@ async function nonStreamingFallback(
       }
     | { role: "tool"; content: string; tool_call_id: string };
 
-  const buildBody = (msgs: ApiMessage[]) => {
+  const buildBody = (msgs: ApiMessage[], thinking: boolean) => {
     const body: Record<string, unknown> = {
       model,
       messages: msgs,
       tools: LUNA_TOOLS,
     };
-    if (thinkingEnabled) {
-      if (isGemini) {
-        body.reasoning_effort = "medium";
-      } else {
-        body.thinking = { type: "enabled" };
-      }
+    if (isGemini) {
+      // Gemini 3.x always thinks — cannot be disabled.
+      body.reasoning_effort = thinking ? "medium" : "low";
+      body.max_tokens = thinking ? 8192 : 1024;
+      body.tool_choice = "auto";
+    } else if (thinking) {
+      body.thinking = { type: "enabled" };
       body.max_tokens = 8192;
     } else {
       body.temperature = 0.5;
@@ -1723,18 +1729,7 @@ async function nonStreamingFallback(
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers,
-      body: JSON.stringify(
-        (() => {
-          const body = buildBody(currentMessages);
-          if (!allowThinking) {
-            delete body.thinking;
-            delete body.reasoning_effort;
-            body.temperature = 0.5;
-            body.max_tokens = 1024;
-          }
-          return body;
-        })(),
-      ),
+      body: JSON.stringify(buildBody(currentMessages, allowThinking)),
       signal,
     });
 
