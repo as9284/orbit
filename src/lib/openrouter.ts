@@ -1425,6 +1425,7 @@ export async function streamLunaChat(
               id: string;
               type: "function";
               function: { name: string; arguments: string };
+              extra_content?: { google: { thought_signature: string } };
             }[];
           }
         | { role: "tool"; content: string; tool_call_id: string };
@@ -1488,7 +1489,43 @@ export async function streamLunaChat(
             round -= 1;
             continue;
           }
-          if (res.status === 400 && errText.includes("stream")) {
+          if (res.status === 400 && (errText.includes("stream") || isGemini)) {
+            // If tool calls have already run in a previous round, do NOT
+            // restart from scratch (which would re-execute the tools).
+            // Instead, attempt a simple non-streaming follow-up with the
+            // current conversation state to get the final summary.
+            if (round > 0) {
+              try {
+                const followBody: Record<string, unknown> = {
+                  model,
+                  messages: currentMessages,
+                  max_tokens: isGemini ? 8192 : 1024,
+                };
+                if (isGemini) followBody.reasoning_effort = "medium";
+                const followRes = await fetch(`${baseUrl}/chat/completions`, {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify(followBody),
+                  signal,
+                });
+                if (followRes.ok) {
+                  const data = (await followRes.json()) as {
+                    choices?: { message?: { content?: string } }[];
+                  };
+                  const text =
+                    data.choices?.[0]?.message?.content?.trim() ?? "";
+                  if (text) {
+                    accumText += text;
+                    callbacks.onToken(text);
+                  }
+                }
+              } catch {
+                /* fall through */
+              }
+              // Tool action already succeeded — surface what we have
+              callbacks.onDone(accumText, accumReasoning || undefined);
+              return model;
+            }
             return await nonStreamingFallback(
               messages,
               baseUrl,
@@ -1516,7 +1553,12 @@ export async function streamLunaChat(
         let roundReasoning = "";
         const toolCalls: Record<
           number,
-          { id: string; name: string; arguments: string }
+          {
+            id: string;
+            name: string;
+            arguments: string;
+            extra_content?: { google: { thought_signature: string } };
+          }
         > = {};
 
         while (true) {
@@ -1543,6 +1585,7 @@ export async function streamLunaChat(
                       index: number;
                       id?: string;
                       function?: { name?: string; arguments?: string };
+                      extra_content?: { google: { thought_signature: string } };
                     }[];
                   };
                 }[];
@@ -1588,6 +1631,9 @@ export async function streamLunaChat(
                     toolCalls[idx].name += tc.function.name;
                   if (tc.function?.arguments)
                     toolCalls[idx].arguments += tc.function.arguments;
+                  // Gemini 3: capture thought signature for function calling
+                  if (tc.extra_content?.google?.thought_signature)
+                    toolCalls[idx].extra_content = tc.extra_content;
                 }
               }
             } catch {
@@ -1633,12 +1679,24 @@ export async function streamLunaChat(
           ...currentMessages,
           {
             role: "assistant" as const,
-            content: roundText || null,
-            tool_calls: toolCallEntries.map((tc) => ({
-              id: tc.id || `call_${tc.name}_${round}`,
-              type: "function" as const,
-              function: { name: tc.name, arguments: tc.arguments },
-            })),
+            // Gemini rejects null content in multi-turn messages
+            content: roundText || (isGemini ? "" : null),
+            tool_calls: toolCallEntries.map((tc) => {
+              const entry: {
+                id: string;
+                type: "function";
+                function: { name: string; arguments: string };
+                extra_content?: { google: { thought_signature: string } };
+              } = {
+                id: tc.id || `call_${tc.name}_${round}`,
+                type: "function" as const,
+                function: { name: tc.name, arguments: tc.arguments },
+              };
+              // Gemini 3: include thought signature so the follow-up round
+              // can pass it back (mandatory for function calling)
+              if (tc.extra_content) entry.extra_content = tc.extra_content;
+              return entry;
+            }),
           },
           ...toolResultPairs.map(({ tc, result }) => ({
             role: "tool" as const,
@@ -1647,9 +1705,10 @@ export async function streamLunaChat(
           })),
         ];
 
-        // After tools run, force the follow-up conclusion round to be plain
-        // generation rather than another reasoning pass.
-        allowThinking = false;
+        // After tools run, disable thinking for DeepSeek to avoid wasting
+        // tokens on reasoning in the follow-up summary. For Gemini, thinking
+        // is always active regardless, so leave allowThinking unchanged.
+        if (!isGemini) allowThinking = false;
       }
 
       if (modelFailed) continue;
@@ -1691,6 +1750,7 @@ async function nonStreamingFallback(
           id: string;
           type: "function";
           function: { name: string; arguments: string };
+          extra_content?: { google: { thought_signature: string } };
         }[];
       }
     | { role: "tool"; content: string; tool_call_id: string };
@@ -1761,6 +1821,7 @@ async function nonStreamingFallback(
           tool_calls?: {
             id?: string;
             function: { name: string; arguments: string };
+            extra_content?: { google: { thought_signature: string } };
           }[];
         };
       }[];
@@ -1819,15 +1880,27 @@ async function nonStreamingFallback(
       ...currentMessages,
       {
         role: "assistant" as const,
-        content: msg.content ?? null,
-        tool_calls: msg.tool_calls.map((tc) => ({
-          id: tc.id ?? `call_${tc.function.name}_${round}`,
-          type: "function" as const,
-          function: {
-            name: tc.function.name,
-            arguments: tc.function.arguments,
-          },
-        })),
+        // Gemini rejects null content in multi-turn messages
+        content: isGemini ? (msg.content ?? "") : (msg.content ?? null),
+        tool_calls: msg.tool_calls.map((tc) => {
+          const entry: {
+            id: string;
+            type: "function";
+            function: { name: string; arguments: string };
+            extra_content?: { google: { thought_signature: string } };
+          } = {
+            id: tc.id ?? `call_${tc.function.name}_${round}`,
+            type: "function" as const,
+            function: {
+              name: tc.function.name,
+              arguments: tc.function.arguments,
+            },
+          };
+          // Gemini 3: include thought signature for function calling
+          if (tc.extra_content?.google?.thought_signature)
+            entry.extra_content = tc.extra_content;
+          return entry;
+        }),
       },
       ...toolResultPairs.map(({ tc, result }) => ({
         role: "tool" as const,
@@ -1836,9 +1909,10 @@ async function nonStreamingFallback(
       })),
     ];
 
-    // After tools run, force the follow-up conclusion round to be plain
-    // generation rather than another reasoning pass.
-    allowThinking = false;
+    // After tools run, disable thinking for DeepSeek to avoid wasting
+    // tokens on reasoning in the follow-up summary. For Gemini, thinking
+    // is always active regardless, so leave allowThinking unchanged.
+    if (!isGemini) allowThinking = false;
   }
 
   callbacks.onDone(accumText, accumReasoning || undefined);
