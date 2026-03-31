@@ -25,6 +25,7 @@ import {
   RefreshCw,
   FolderOpen,
   Unlink,
+  ListChecks,
 } from "lucide-react";
 import { useTasksApi, useNotesApi } from "../components/layout/AppLayout";
 import { useAuth } from "../contexts/AuthContext";
@@ -280,17 +281,29 @@ export function LunaPage() {
       setStreaming(true);
 
       // Build conversation history for the API
+      // Fetch sub-tasks for active tasks so Luna sees the full picture
+      const tasksWithSubTasks = await Promise.all(
+        tasksApi.activeTasks.map(async (t) => {
+          const subTasks = await tasksApi.fetchSubTasks(t.id);
+          return {
+            title: t.title,
+            description: t.description,
+            priority: t.priority,
+            due_date: t.due_date,
+            completed: t.completed,
+            subTasks: subTasks.map((st) => ({
+              title: st.title,
+              completed: st.completed,
+            })),
+          };
+        }),
+      );
+
       const history: ChatMessage[] = [
         {
           role: "system",
           content: buildLunaSystemPrompt({
-            tasks: tasksApi.activeTasks.map((t) => ({
-              title: t.title,
-              description: t.description,
-              priority: t.priority,
-              due_date: t.due_date,
-              completed: t.completed,
-            })),
+            tasks: tasksWithSubTasks,
             archivedTasks: tasksApi.archivedTasks.map((t) => ({
               title: t.title,
               description: t.description,
@@ -796,6 +809,62 @@ export function LunaPage() {
               return ok
                 ? `Task updated: "${updates.title ?? match.title}"`
                 : "Failed to update task";
+            }
+
+            if (name === "add_subtasks") {
+              const taskTitle = String(args.task_title ?? "");
+              const newSubTasks = Array.isArray(args.sub_tasks)
+                ? (args.sub_tasks as string[]).map((s) => String(s))
+                : [];
+              if (newSubTasks.length === 0) {
+                return "No sub-tasks provided.";
+              }
+              const match =
+                tasksApi.activeTasks.find(
+                  (t) => t.title.toLowerCase() === taskTitle.toLowerCase(),
+                ) ??
+                tasksApi.activeTasks.find((t) =>
+                  t.title.toLowerCase().includes(taskTitle.toLowerCase()),
+                );
+              if (!match) {
+                return `Could not find an active task matching "${taskTitle}"`;
+              }
+              const statusId = createToolStatusMessage(
+                "add_subtasks",
+                `Adding ${newSubTasks.length} sub-task(s) to: ${match.title}`,
+              );
+              await waitForNextPaint();
+              // Fetch existing sub-tasks to preserve them
+              const existing = await tasksApi.fetchSubTasks(match.id);
+              const existingIds = existing.map((st) => st.id);
+              const merged = [
+                ...existing.map((st) => ({
+                  id: st.id,
+                  title: st.title,
+                  completed: st.completed,
+                })),
+                ...newSubTasks.map((title) => ({ title, completed: false })),
+              ];
+              const ok = await tasksApi.saveSubTasks(
+                match.id,
+                merged,
+                existingIds,
+              );
+              updateToolStatusMessage(statusId, {
+                tool: "add_subtasks",
+                status: ok ? "success" : "error",
+                label: ok
+                  ? `Added ${newSubTasks.length} sub-task(s) to: ${match.title}`
+                  : "Failed to add sub-tasks",
+              });
+              if (ok)
+                toast.success(
+                  `Added ${newSubTasks.length} sub-task(s) to "${match.title}"`,
+                );
+              else toast.error("Failed to add sub-tasks");
+              return ok
+                ? `Added ${newSubTasks.length} sub-task(s) to "${match.title}": ${newSubTasks.map((s) => `"${s}"`).join(", ")}`
+                : "Failed to add sub-tasks";
             }
 
             if (name === "update_note") {
@@ -1514,6 +1583,8 @@ function MessageBubble({ message }: { message: UIMessage }) {
                   <StickyNote size={12} />
                 ) : tr.tool === "delete_note" || tr.tool === "delete_task" ? (
                   <Trash2 size={12} />
+                ) : tr.tool === "add_subtasks" ? (
+                  <ListChecks size={12} />
                 ) : tr.tool === "transform_text" ? (
                   <PenLine size={12} />
                 ) : tr.tool === "start_meeting" ||

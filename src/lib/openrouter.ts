@@ -1098,6 +1098,29 @@ const LUNA_TOOLS: LunaTool[] = [
   {
     type: "function",
     function: {
+      name: "add_subtasks",
+      description:
+        "Add one or more sub-tasks to an existing task. Existing sub-tasks are preserved. Use when the user asks to add steps, checklist items, or sub-tasks to a task.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_title: {
+            type: "string",
+            description: "The title of the task to add sub-tasks to",
+          },
+          sub_tasks: {
+            type: "array",
+            items: { type: "string" },
+            description: "List of sub-task titles to add",
+          },
+        },
+        required: ["task_title", "sub_tasks"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "update_note",
       description:
         "Update an existing note's title or content. Use when the user asks to edit, change, rename, or modify a note.",
@@ -1330,6 +1353,7 @@ export function buildLunaSystemPrompt(context: {
     priority: string;
     due_date?: string | null;
     completed: boolean;
+    subTasks?: { title: string; completed: boolean }[];
   }[];
   archivedTasks?: {
     title: string;
@@ -1373,6 +1397,12 @@ export function buildLunaSystemPrompt(context: {
         parts.push(
           `  Description: ${snippet}${t.description.trim().length > 180 ? "…" : ""}`,
         );
+      }
+      if (t.subTasks && t.subTasks.length > 0) {
+        parts.push(`  Sub-tasks:`);
+        for (const st of t.subTasks) {
+          parts.push(`    - [${st.completed ? "x" : " "}] ${st.title}`);
+        }
       }
       return parts.join("\n");
     })
@@ -1477,6 +1507,7 @@ export function buildLunaSystemPrompt(context: {
     "- Answer questions about the user's tasks, notes, projects, priorities, schedule, and meeting sessions",
     "- Create new tasks (with sub-tasks, priority, due date, and optional project) and notes using the provided tools",
     "- Update existing tasks (title, description, priority, due date) and notes (title, content) using the provided tools",
+    "- Add sub-tasks to existing tasks using add_subtasks",
     "- Archive or mark tasks as complete using the provided tools",
     "- Unarchive tasks to restore them from the archive back to the active list",
     "- Permanently delete tasks (active or archived) and notes when explicitly asked",
