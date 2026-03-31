@@ -96,9 +96,7 @@ export function LunaPage() {
   });
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [thinkingMode, setThinkingMode] = useState(
-    () => getAiSettings().provider === "gemini",
-  );
+  const [thinkingMode, setThinkingMode] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const activeAssistantMessageIdRef = useRef<string | null>(null);
   const activeAssistantHasOutputRef = useRef(false);
@@ -330,7 +328,10 @@ export function LunaPage() {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const shouldThink = thinkingMode && activeModelSupportsThinking();
+      // Gemini always thinks automatically; for other providers respect the toggle
+      const isGeminiProvider = getAiSettings().provider === "gemini";
+      const shouldThink =
+        isGeminiProvider || (thinkingMode && activeModelSupportsThinking());
 
       await streamLunaChat(
         history,
@@ -1051,21 +1052,22 @@ export function LunaPage() {
           <h1 className="text-sm font-bold text-white tracking-tight">Luna</h1>
           <p className="text-[10px] text-white/30">Your Orbit AI assistant</p>
         </div>
-        {activeModelSupportsThinking() && (
-          <button
-            onClick={() => setThinkingMode((v) => !v)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${
-              thinkingMode
-                ? "text-amber-400 bg-amber-500/10 border border-amber-500/20"
-                : "text-white/30 hover:text-white/60 hover:bg-white/5"
-            }`}
-            aria-label="Toggle thinking mode"
-            title={thinkingMode ? "Thinking mode on" : "Thinking mode off"}
-          >
-            <Sparkles size={12} />
-            Think
-          </button>
-        )}
+        {activeModelSupportsThinking() &&
+          getAiSettings().provider !== "gemini" && (
+            <button
+              onClick={() => setThinkingMode((v) => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${
+                thinkingMode
+                  ? "text-amber-400 bg-amber-500/10 border border-amber-500/20"
+                  : "text-white/30 hover:text-white/60 hover:bg-white/5"
+              }`}
+              aria-label="Toggle thinking mode"
+              title={thinkingMode ? "Thinking mode on" : "Thinking mode off"}
+            >
+              <Sparkles size={12} />
+              Think
+            </button>
+          )}
         {messages.length > 0 && (
           <button
             onClick={handleClear}
